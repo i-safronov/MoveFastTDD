@@ -70,9 +70,11 @@ object TimerScreen : Screen {
 
         TimerContent(
             state = viewModel.state,
-            onStop = { viewModel.dispatch(TimerContract.Executor.Stop) },
-            onResume = { viewModel.dispatch(TimerContract.Executor.Resume) },
-            onCancel = { viewModel.dispatch(TimerContract.Executor.Cancel) },
+            actions = object : TimerActions {
+                override fun onStop() = viewModel.dispatch(TimerContract.Executor.Stop)
+                override fun onResume() = viewModel.dispatch(TimerContract.Executor.Resume)
+                override fun onCancel() = viewModel.dispatch(TimerContract.Executor.Cancel)
+            },
         )
     }
 }
@@ -80,9 +82,7 @@ object TimerScreen : Screen {
 @Composable
 internal fun TimerContent(
     state: TimerContract.State,
-    onStop: () -> Unit,
-    onResume: () -> Unit,
-    onCancel: () -> Unit,
+    actions: TimerActions,
 ) {
     if (state.isLoading) {
         Box(
@@ -114,14 +114,14 @@ internal fun TimerContent(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (isFinished) {
-            FinishedContent(onDone = onCancel)
+            FinishedContent(onDone = actions::onCancel)
         } else {
             ActiveTimerContent(
                 state = state,
                 phaseColor = phaseColor,
-                onStop = onStop,
-                onResume = onResume,
-                onCancel = onCancel,
+                onStop = actions::onStop,
+                onResume = actions::onResume,
+                onCancel = actions::onCancel,
             )
         }
     }
@@ -243,6 +243,12 @@ private fun FinishedContent(onDone: () -> Unit) {
     }
 }
 
+private val previewActions = object : TimerActions {
+    override fun onStop() = Unit
+    override fun onResume() = Unit
+    override fun onCancel() = Unit
+}
+
 internal fun Int.formatTime(): String {
     val minutes = this / 60
     val seconds = this % 60
@@ -267,7 +273,7 @@ private fun TimerWorkPreview() {
                 remainingSeconds = 24,
                 isRunning = true,
             ),
-            onStop = {}, onResume = {}, onCancel = {},
+            actions = previewActions,
         )
     }
 }
@@ -289,7 +295,7 @@ private fun TimerRestPreview() {
                 remainingSeconds = 8,
                 isRunning = true,
             ),
-            onStop = {}, onResume = {}, onCancel = {},
+            actions = previewActions,
         )
     }
 }
@@ -311,7 +317,7 @@ private fun TimerPausedPreview() {
                 remainingSeconds = 15,
                 isRunning = false,
             ),
-            onStop = {}, onResume = {}, onCancel = {},
+            actions = previewActions,
         )
     }
 }
@@ -328,7 +334,7 @@ private fun TimerFinishedPreview() {
                 remainingSeconds = 0,
                 isRunning = false,
             ),
-            onStop = {}, onResume = {}, onCancel = {},
+            actions = previewActions,
         )
     }
 }

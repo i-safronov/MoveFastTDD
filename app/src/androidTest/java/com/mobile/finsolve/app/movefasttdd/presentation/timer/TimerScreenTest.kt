@@ -26,6 +26,12 @@ class TimerScreenTest {
 
     private val page = TimerPage(composeTestRule)
 
+    private fun noopActions() = object : TimerActions {
+        override fun onStop() = Unit
+        override fun onResume() = Unit
+        override fun onCancel() = Unit
+    }
+
     // region Helpers
 
     private val defaultPhases = listOf(
@@ -76,9 +82,11 @@ class TimerScreenTest {
             BackHandler { onCancel() }
             TimerContent(
                 state = state,
-                onStop = onStop,
-                onResume = onResume,
-                onCancel = onCancel,
+                actions = object : TimerActions {
+                    override fun onStop() = onStop()
+                    override fun onResume() = onResume()
+                    override fun onCancel() = onCancel()
+                },
             )
         }
     }
@@ -442,7 +450,13 @@ class TimerScreenTest {
         fun content() {
             composeTestRule.setContent {
                 BackHandler { cancelCalled = true }
-                TimerContent(state = workState(), onStop = {}, onResume = {}, onCancel = { cancelCalled = true })
+                TimerContent(state = workState(), actions = object : TimerActions {
+                    override fun onStop() = Unit
+                    override fun onResume() = Unit
+                    override fun onCancel() {
+                        cancelCalled = true
+                    }
+                })
             }
         }
         content()
@@ -458,7 +472,14 @@ class TimerScreenTest {
         var stopCalled = false
         fun content() {
             composeTestRule.setContent {
-                TimerContent(state = workState(isRunning = true), onStop = { stopCalled = true }, onResume = {}, onCancel = {})
+                TimerContent(state = workState(isRunning = true), actions = object : TimerActions {
+                    override fun onStop() {
+                        stopCalled = true
+                    }
+
+                    override fun onResume() = Unit
+                    override fun onCancel() = Unit
+                })
             }
         }
         content()
@@ -476,9 +497,17 @@ class TimerScreenTest {
             composeTestRule.setContent {
                 TimerContent(
                     state = workState(isRunning = isRunning),
-                    onStop = { isRunning = false },
-                    onResume = { isRunning = true },
-                    onCancel = {},
+                    actions = object : TimerActions {
+                        override fun onStop() {
+                            isRunning = false
+                        }
+
+                        override fun onResume() {
+                            isRunning = true
+                        }
+
+                        override fun onCancel() = Unit
+                    },
                 )
             }
         }
@@ -496,7 +525,9 @@ class TimerScreenTest {
 
     @Test
     fun multipleRotations_uiRemainsStable() {
-        fun content() { setContent(state = workState(remainingSeconds = 42)) }
+        fun content() {
+            setContent(state = workState(remainingSeconds = 42))
+        }
         content()
         repeat(3) {
             composeTestRule.activityRule.scenario.recreate()
@@ -514,7 +545,14 @@ class TimerScreenTest {
     fun rapidPause_callsOnStop_eachTime() {
         var stopCount = 0
         composeTestRule.setContent {
-            TimerContent(state = workState(isRunning = true), onStop = { stopCount++ }, onResume = {}, onCancel = {})
+            TimerContent(state = workState(isRunning = true), actions = object : TimerActions {
+                override fun onStop() {
+                    stopCount++
+                }
+
+                override fun onResume() = Unit
+                override fun onCancel() = Unit
+            })
         }
         repeat(10) { page.clickPause() }
         assertEquals(10, stopCount)
@@ -524,7 +562,14 @@ class TimerScreenTest {
     fun rapidResume_callsOnResume_eachTime() {
         var resumeCount = 0
         composeTestRule.setContent {
-            TimerContent(state = workState(isRunning = false), onStop = {}, onResume = { resumeCount++ }, onCancel = {})
+            TimerContent(state = workState(isRunning = false), actions = object : TimerActions {
+                override fun onStop() = Unit
+                override fun onResume() {
+                    resumeCount++
+                }
+
+                override fun onCancel() = Unit
+            })
         }
         repeat(10) { page.clickResume() }
         assertEquals(10, resumeCount)
@@ -536,9 +581,17 @@ class TimerScreenTest {
         composeTestRule.setContent {
             TimerContent(
                 state = workState(isRunning = isRunning),
-                onStop = { isRunning = false },
-                onResume = { isRunning = true },
-                onCancel = {},
+                actions = object : TimerActions {
+                    override fun onStop() {
+                        isRunning = false
+                    }
+
+                    override fun onResume() {
+                        isRunning = true
+                    }
+
+                    override fun onCancel() = Unit
+                },
             )
         }
         repeat(9) {
@@ -555,9 +608,17 @@ class TimerScreenTest {
         composeTestRule.setContent {
             TimerContent(
                 state = workState(isRunning = isRunning),
-                onStop = { isRunning = false },
-                onResume = { isRunning = true },
-                onCancel = {},
+                actions = object : TimerActions {
+                    override fun onStop() {
+                        isRunning = false
+                    }
+
+                    override fun onResume() {
+                        isRunning = true
+                    }
+
+                    override fun onCancel() = Unit
+                },
             )
         }
         repeat(10) {
@@ -574,9 +635,17 @@ class TimerScreenTest {
         composeTestRule.setContent {
             TimerContent(
                 state = workState(isRunning = isRunning),
-                onStop = { isRunning = false },
-                onResume = { isRunning = true },
-                onCancel = {},
+                actions = object : TimerActions {
+                    override fun onStop() {
+                        isRunning = false
+                    }
+
+                    override fun onResume() {
+                        isRunning = true
+                    }
+
+                    override fun onCancel() = Unit
+                },
             )
         }
         repeat(6) {
@@ -598,9 +667,17 @@ class TimerScreenTest {
         composeTestRule.setContent {
             TimerContent(
                 state = workState(isRunning = isRunning),
-                onStop = { isRunning = false },
-                onResume = { isRunning = true },
-                onCancel = {},
+                actions = object : TimerActions {
+                    override fun onStop() {
+                        isRunning = false
+                    }
+
+                    override fun onResume() {
+                        isRunning = true
+                    }
+
+                    override fun onCancel() = Unit
+                },
             )
         }
         repeat(8) {
@@ -617,9 +694,17 @@ class TimerScreenTest {
         composeTestRule.setContent {
             TimerContent(
                 state = workState(isRunning = isRunning),
-                onStop = { isRunning = false },
-                onResume = { isRunning = true },
-                onCancel = {},
+                actions = object : TimerActions {
+                    override fun onStop() {
+                        isRunning = false
+                    }
+
+                    override fun onResume() {
+                        isRunning = true
+                    }
+
+                    override fun onCancel() = Unit
+                },
             )
         }
         repeat(10) {
@@ -636,9 +721,19 @@ class TimerScreenTest {
         composeTestRule.setContent {
             TimerContent(
                 state = workState(isRunning = isRunning),
-                onStop = { isRunning = false },
-                onResume = { isRunning = true },
-                onCancel = { cancelCalled = true },
+                actions = object : TimerActions {
+                    override fun onStop() {
+                        isRunning = false
+                    }
+
+                    override fun onResume() {
+                        isRunning = true
+                    }
+
+                    override fun onCancel() {
+                        cancelCalled = true
+                    }
+                },
             )
         }
         repeat(3) {
