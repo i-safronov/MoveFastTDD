@@ -57,10 +57,12 @@ class SetupScreen : Screen {
 
         SetupContent(
             state = viewModel.state,
-            onRepsChange = { viewModel.dispatch(SetupContract.Executor.UpdateReps(it)) },
-            onRepDurationChange = { viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(it)) },
-            onRestDurationChange = { viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(it)) },
-            onStart = { viewModel.dispatch(SetupContract.Executor.Start) },
+            actions = object : SetupActions {
+                override fun onRepsChange(value: Int) = viewModel.dispatch(SetupContract.Executor.UpdateReps(value))
+                override fun onRepDurationChange(value: Int) = viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(value))
+                override fun onRestDurationChange(value: Int) = viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(value))
+                override fun onStart() = viewModel.dispatch(SetupContract.Executor.Start)
+            },
         )
     }
 }
@@ -68,10 +70,7 @@ class SetupScreen : Screen {
 @Composable
 internal fun SetupContent(
     state: SetupContract.State,
-    onRepsChange: (Int) -> Unit,
-    onRepDurationChange: (Int) -> Unit,
-    onRestDurationChange: (Int) -> Unit,
-    onStart: () -> Unit,
+    actions: SetupActions
 ) {
     Column(
         modifier = Modifier
@@ -89,7 +88,7 @@ internal fun SetupContent(
             value = state.reps,
             isError = state.repsError,
             testTag = SetupScreenTags.REPS_FIELD,
-            onChange = onRepsChange,
+            onChange = actions::onRepsChange,
         )
 
         Spacer(Modifier.height(12.dp))
@@ -99,7 +98,7 @@ internal fun SetupContent(
             value = state.repDuration,
             isError = state.repDurationError,
             testTag = SetupScreenTags.REP_DURATION_FIELD,
-            onChange = onRepDurationChange,
+            onChange = actions::onRepDurationChange,
         )
 
         Spacer(Modifier.height(12.dp))
@@ -109,7 +108,7 @@ internal fun SetupContent(
             value = state.restDuration,
             isError = state.restDurationError,
             testTag = SetupScreenTags.REST_DURATION_FIELD,
-            onChange = onRestDurationChange,
+            onChange = actions::onRestDurationChange,
         )
 
         Spacer(Modifier.height(8.dp))
@@ -123,7 +122,7 @@ internal fun SetupContent(
         Spacer(Modifier.height(24.dp))
 
         Button(
-            onClick = onStart,
+            onClick = actions::onStart,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(SetupScreenTags.START_BUTTON),
@@ -190,16 +189,20 @@ private fun SetupErrorMessage() {
     )
 }
 
+private val previewActions = object : SetupActions {
+    override fun onRepsChange(value: Int) = Unit
+    override fun onRepDurationChange(value: Int) = Unit
+    override fun onRestDurationChange(value: Int) = Unit
+    override fun onStart() = Unit
+}
+
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun SetupContentPreview() {
     MoveFastTDDTheme {
         SetupContent(
             state = SetupContract.State(),
-            onRepsChange = {},
-            onRepDurationChange = {},
-            onRestDurationChange = {},
-            onStart = {},
+            actions = previewActions,
         )
     }
 }
@@ -209,16 +212,8 @@ private fun SetupContentPreview() {
 private fun SetupContentErrorPreview() {
     MoveFastTDDTheme {
         SetupContent(
-            state = SetupContract.State(
-                reps = 0,
-                repDuration = 0,
-                repsError = true,
-                repDurationError = true
-            ),
-            onRepsChange = {},
-            onRepDurationChange = {},
-            onRestDurationChange = {},
-            onStart = {},
+            state = SetupContract.State(reps = 0, repDuration = 0, repsError = true, repDurationError = true),
+            actions = previewActions,
         )
     }
 }

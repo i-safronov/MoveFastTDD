@@ -22,6 +22,13 @@ class SetupScreenTest {
 
     private val page = SetupPage(composeTestRule)
 
+    private fun noopActions() = object : SetupActions {
+        override fun onRepsChange(value: Int) = Unit
+        override fun onRepDurationChange(value: Int) = Unit
+        override fun onRestDurationChange(value: Int) = Unit
+        override fun onStart() = Unit
+    }
+
     private fun setContent(
         state: SetupContract.State = SetupContract.State(),
         onRepsChange: (Int) -> Unit = {},
@@ -32,10 +39,12 @@ class SetupScreenTest {
         composeTestRule.setContent {
             SetupContent(
                 state = state,
-                onRepsChange = onRepsChange,
-                onRepDurationChange = onRepDurationChange,
-                onRestDurationChange = onRestDurationChange,
-                onStart = onStart,
+                actions = object : SetupActions {
+                    override fun onRepsChange(value: Int) = onRepsChange(value)
+                    override fun onRepDurationChange(value: Int) = onRepDurationChange(value)
+                    override fun onRestDurationChange(value: Int) = onRestDurationChange(value)
+                    override fun onStart() = onStart()
+                },
             )
         }
     }
@@ -246,10 +255,12 @@ class SetupScreenTest {
             composeTestRule.setContent {
                 SetupContent(
                     state = SetupContract.State(reps = reps),
-                    onRepsChange = { reps = it },
-                    onRepDurationChange = {},
-                    onRestDurationChange = {},
-                    onStart = {},
+                    actions = object : SetupActions {
+                        override fun onRepsChange(value: Int) { reps = value }
+                        override fun onRepDurationChange(value: Int) = Unit
+                        override fun onRestDurationChange(value: Int) = Unit
+                        override fun onStart() = Unit
+                    },
                 )
             }
         }
@@ -270,10 +281,7 @@ class SetupScreenTest {
             composeTestRule.setContent {
                 SetupContent(
                     state = SetupContract.State(repsError = repsError),
-                    onRepsChange = {},
-                    onRepDurationChange = {},
-                    onRestDurationChange = {},
-                    onStart = {},
+                    actions = noopActions(),
                 )
             }
         }
@@ -291,13 +299,7 @@ class SetupScreenTest {
     fun rotation_noErrorStatePreservedWhenNoError() {
         fun content() {
             composeTestRule.setContent {
-                SetupContent(
-                    state = SetupContract.State(),
-                    onRepsChange = {},
-                    onRepDurationChange = {},
-                    onRestDurationChange = {},
-                    onStart = {},
-                )
+                SetupContent(state = SetupContract.State(), actions = noopActions())
             }
         }
         content()
@@ -317,10 +319,12 @@ class SetupScreenTest {
             composeTestRule.setContent {
                 SetupContent(
                     state = SetupContract.State(),
-                    onRepsChange = {},
-                    onRepDurationChange = {},
-                    onRestDurationChange = {},
-                    onStart = { startCalled = true },
+                    actions = object : SetupActions {
+                        override fun onRepsChange(value: Int) = Unit
+                        override fun onRepDurationChange(value: Int) = Unit
+                        override fun onRestDurationChange(value: Int) = Unit
+                        override fun onStart() { startCalled = true }
+                    },
                 )
             }
         }
@@ -337,13 +341,7 @@ class SetupScreenTest {
     fun multipleRotations_uiStaysCorrect() {
         fun content(repsError: Boolean = false) {
             composeTestRule.setContent {
-                SetupContent(
-                    state = SetupContract.State(repsError = repsError),
-                    onRepsChange = {},
-                    onRepDurationChange = {},
-                    onRestDurationChange = {},
-                    onStart = {},
-                )
+                SetupContent(state = SetupContract.State(repsError = repsError), actions = noopActions())
             }
         }
         content(repsError = true)
