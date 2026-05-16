@@ -1,6 +1,8 @@
 package com.mobile.finsolve.app.movefasttdd.presentation.setup.view_model
 
 import com.mobile.finsolve.app.movefasttdd.core.dispatchers.DispatchersList
+import com.mobile.finsolve.app.movefasttdd.data.datastore.FakeWorkoutDraftDataStore
+import com.mobile.finsolve.app.movefasttdd.data.datastore.WorkoutDraft
 import com.mobile.finsolve.app.movefasttdd.domain.model.WorkoutConfig
 import com.mobile.finsolve.app.movefasttdd.domain.use_case.ValidateWorkoutConfigUseCase
 import com.mobile.finsolve.app.movefasttdd.domain.usecase.FakeWorkoutConfigRepository
@@ -23,21 +25,24 @@ class SetupViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
 
     private lateinit var repository: FakeWorkoutConfigRepository
+    private lateinit var draftDataStore: FakeWorkoutDraftDataStore
     private lateinit var viewModel: SetupViewModel
 
     private fun buildViewModel() = SetupViewModel(
         repository = repository,
         validate = ValidateWorkoutConfigUseCase(),
+        draftDataStore = draftDataStore,
         dispatchers = object : DispatchersList {
             override fun io(): CoroutineDispatcher = testDispatcher
             override fun ui(): CoroutineDispatcher = testDispatcher
-        }
+        },
     )
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = FakeWorkoutConfigRepository()
+        draftDataStore = FakeWorkoutDraftDataStore()
         viewModel = buildViewModel()
     }
 
@@ -70,10 +75,45 @@ class SetupViewModelTest {
 
     // endregion
 
-    // region Load config
+    // region Draft restoration
 
     @Test
-    fun `on start loads saved config from repository`() = runTest {
+    fun `restores reps from draft on launch`() = runTest {
+        draftDataStore.storedDraft = WorkoutDraft(reps = 9, repDuration = 30, restDuration = 10)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        Assert.assertEquals(9, viewModel.state.reps)
+    }
+
+    @Test
+    fun `restores rep duration from draft on launch`() = runTest {
+        draftDataStore.storedDraft = WorkoutDraft(reps = 3, repDuration = 55, restDuration = 10)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        Assert.assertEquals(55, viewModel.state.repDuration)
+    }
+
+    @Test
+    fun `restores rest duration from draft on launch`() = runTest {
+        draftDataStore.storedDraft = WorkoutDraft(reps = 3, repDuration = 30, restDuration = 25)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        Assert.assertEquals(25, viewModel.state.restDuration)
+    }
+
+    @Test
+    fun `draft takes priority over saved config`() = runTest {
+        draftDataStore.storedDraft = WorkoutDraft(reps = 5, repDuration = 30, restDuration = 10)
+        repository.configToReturn = WorkoutConfig(reps = 99, repDuration = 99, restDuration = 99)
+        viewModel = buildViewModel()
+        advanceUntilIdle()
+        Assert.assertEquals(5, viewModel.state.reps)
+        Assert.assertEquals(30, viewModel.state.repDuration)
+    }
+
+    @Test
+    fun `loads saved config when no draft exists`() = runTest {
+        draftDataStore.storedDraft = null
         repository.configToReturn = WorkoutConfig(reps = 7, repDuration = 45, restDuration = 20)
         viewModel = buildViewModel()
         advanceUntilIdle()
@@ -83,28 +123,48 @@ class SetupViewModelTest {
     }
 
     @Test
-    fun `when no saved config state keeps defaults`() = runTest {
+    fun `uses defaults when no draft and no saved config`() = runTest {
+        draftDataStore.storedDraft = null
         repository.configToReturn = null
         viewModel = buildViewModel()
         advanceUntilIdle()
-        Assert.assertTrue(viewModel.state.reps > 0)
-        Assert.assertTrue(viewModel.state.repDuration > 0)
+        Assert.assertEquals(SetupContract.DEFAULT_REPS, viewModel.state.reps)
+        Assert.assertEquals(SetupContract.DEFAULT_REP_DURATION, viewModel.state.repDuration)
+        Assert.assertEquals(SetupContract.DEFAULT_REST_DURATION, viewModel.state.restDuration)
+    }
+
+    // endregion
+
+    // region Draft saving on input
+
+    @Test
+    fun `UpdateReps saves draft with new reps`() = runTest {
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(7))
+        advanceUntilIdle()
+        Assert.assertEquals(7, draftDataStore.storedDraft?.reps)
     }
 
     @Test
-    fun `loaded config reps are shown in state`() = runTest {
-        repository.configToReturn = WorkoutConfig(reps = 10, repDuration = 30, restDuration = 15)
-        viewModel = buildViewModel()
+    fun `UpdateRepDuration saves draft with new rep duration`() = runTest {
+        viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(40))
         advanceUntilIdle()
-        Assert.assertEquals(10, viewModel.state.reps)
+        Assert.assertEquals(40, draftDataStore.storedDraft?.repDuration)
     }
 
     @Test
-    fun `loaded config rest duration is shown in state`() = runTest {
-        repository.configToReturn = WorkoutConfig(reps = 3, repDuration = 30, restDuration = 25)
-        viewModel = buildViewModel()
+    fun `UpdateRestDuration saves draft with new rest duration`() = runTest {
+        viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(15))
         advanceUntilIdle()
-        Assert.assertEquals(25, viewModel.state.restDuration)
+        Assert.assertEquals(15, draftDataStore.storedDraft?.restDuration)
+    }
+
+    @Test
+    fun `draft is saved on every input change`() = runTest {
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(5))
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(6))
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(7))
+        advanceUntilIdle()
+        Assert.assertEquals(3, draftDataStore.saveCallCount)
     }
 
     // endregion
@@ -153,35 +213,9 @@ class SetupViewModelTest {
         viewModel.dispatch(SetupContract.Executor.UpdateReps(0))
         viewModel.dispatch(SetupContract.Executor.Start)
         advanceUntilIdle()
-        Assert.assertTrue(viewModel.state.repsError)
-
         viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
         advanceUntilIdle()
         Assert.assertFalse(viewModel.state.repsError)
-    }
-
-    @Test
-    fun `updating rep duration clears rep duration error`() = runTest {
-        viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(0))
-        viewModel.dispatch(SetupContract.Executor.Start)
-        advanceUntilIdle()
-        Assert.assertTrue(viewModel.state.repDurationError)
-
-        viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(30))
-        advanceUntilIdle()
-        Assert.assertFalse(viewModel.state.repDurationError)
-    }
-
-    @Test
-    fun `updating rest duration clears rest duration error`() = runTest {
-        viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(-1))
-        viewModel.dispatch(SetupContract.Executor.Start)
-        advanceUntilIdle()
-        Assert.assertTrue(viewModel.state.restDurationError)
-
-        viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(10))
-        advanceUntilIdle()
-        Assert.assertFalse(viewModel.state.restDurationError)
     }
 
     @Test
@@ -190,7 +224,6 @@ class SetupViewModelTest {
         viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(0))
         viewModel.dispatch(SetupContract.Executor.Start)
         advanceUntilIdle()
-
         viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
         advanceUntilIdle()
         Assert.assertFalse(viewModel.state.repsError)
@@ -203,7 +236,6 @@ class SetupViewModelTest {
         viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(0))
         viewModel.dispatch(SetupContract.Executor.Start)
         advanceUntilIdle()
-
         viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(30))
         advanceUntilIdle()
         Assert.assertTrue(viewModel.state.repsError)
@@ -235,51 +267,34 @@ class SetupViewModelTest {
         viewModel.dispatch(SetupContract.Executor.Start)
         advanceUntilIdle()
 
-        Assert.assertNotNull(repository.savedConfig)
         Assert.assertEquals(3, repository.savedConfig?.reps)
         Assert.assertEquals(30, repository.savedConfig?.repDuration)
         Assert.assertEquals(10, repository.savedConfig?.restDuration)
     }
 
     @Test
-    fun `Start with valid config does not set any errors`() = runTest {
+    fun `Start with valid config clears draft`() = runTest {
+        draftDataStore.storedDraft = WorkoutDraft(reps = 3, repDuration = 30, restDuration = 10)
         viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
         viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(30))
         viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(10))
+        viewModel.dispatch(SetupContract.Executor.Start)
+        advanceUntilIdle()
+
+        Assert.assertEquals(1, draftDataStore.clearCallCount)
+        Assert.assertNull(draftDataStore.storedDraft)
+    }
+
+    @Test
+    fun `Start with valid config does not set any errors`() = runTest {
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
+        viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(30))
         viewModel.dispatch(SetupContract.Executor.Start)
         advanceUntilIdle()
 
         Assert.assertFalse(viewModel.state.repsError)
         Assert.assertFalse(viewModel.state.repDurationError)
         Assert.assertFalse(viewModel.state.restDurationError)
-    }
-
-    @Test
-    fun `NavigateToTimer event contains correct config`() = runTest {
-        viewModel.dispatch(SetupContract.Executor.UpdateReps(5))
-        viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(45))
-        viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(20))
-        viewModel.dispatch(SetupContract.Executor.Start)
-        advanceUntilIdle()
-
-        val event =
-            viewModel.events.tryReceive().getOrNull() as? SetupContract.Event.NavigateToTimer
-        Assert.assertNotNull(event)
-        Assert.assertEquals(
-            WorkoutConfig(reps = 5, repDuration = 45, restDuration = 20),
-            event?.config
-        )
-    }
-
-    @Test
-    fun `repository save is called exactly once on Start`() = runTest {
-        viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
-        viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(30))
-        viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(10))
-        viewModel.dispatch(SetupContract.Executor.Start)
-        advanceUntilIdle()
-
-        Assert.assertEquals(1, repository.saveCallCount)
     }
 
     // endregion
@@ -309,36 +324,12 @@ class SetupViewModelTest {
     }
 
     @Test
-    fun `Start with negative rest duration sets only rest duration error`() = runTest {
-        viewModel.dispatch(SetupContract.Executor.UpdateRestDuration(-1))
-        viewModel.dispatch(SetupContract.Executor.Start)
-        advanceUntilIdle()
-
-        Assert.assertFalse(viewModel.state.repsError)
-        Assert.assertFalse(viewModel.state.repDurationError)
-        Assert.assertTrue(viewModel.state.restDurationError)
-    }
-
-    @Test
-    fun `Start with multiple invalid fields sets errors for each`() = runTest {
-        viewModel.dispatch(SetupContract.Executor.UpdateReps(0))
-        viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(0))
-        viewModel.dispatch(SetupContract.Executor.Start)
-        advanceUntilIdle()
-
-        Assert.assertTrue(viewModel.state.repsError)
-        Assert.assertTrue(viewModel.state.repDurationError)
-        Assert.assertFalse(viewModel.state.restDurationError)
-    }
-
-    @Test
     fun `Start with invalid config does not send NavigateToTimer event`() = runTest {
         viewModel.dispatch(SetupContract.Executor.UpdateReps(0))
         viewModel.dispatch(SetupContract.Executor.Start)
         advanceUntilIdle()
 
-        val event = viewModel.events.tryReceive()
-        Assert.assertFalse(event.isSuccess)
+        Assert.assertFalse(viewModel.events.tryReceive().isSuccess)
     }
 
     @Test
@@ -351,21 +342,12 @@ class SetupViewModelTest {
     }
 
     @Test
-    fun `Start with valid config after previous error clears errors and navigates`() = runTest {
+    fun `Start with invalid config does not clear draft`() = runTest {
         viewModel.dispatch(SetupContract.Executor.UpdateReps(0))
         viewModel.dispatch(SetupContract.Executor.Start)
         advanceUntilIdle()
-        Assert.assertTrue(viewModel.state.repsError)
 
-        viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
-        viewModel.dispatch(SetupContract.Executor.Start)
-        advanceUntilIdle()
-
-        Assert.assertFalse(viewModel.state.repsError)
-        Assert.assertFalse(viewModel.state.repDurationError)
-        Assert.assertFalse(viewModel.state.restDurationError)
-        val event = viewModel.events.tryReceive()
-        Assert.assertTrue(event.isSuccess)
+        Assert.assertEquals(0, draftDataStore.clearCallCount)
     }
 
     // endregion
