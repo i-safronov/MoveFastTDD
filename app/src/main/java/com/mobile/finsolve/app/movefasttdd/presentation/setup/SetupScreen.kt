@@ -39,6 +39,7 @@ object SetupScreenTags {
     const val REST_DURATION_FIELD = "setup_rest_duration_field"
     const val START_BUTTON = "setup_start_button"
     const val ERROR_MESSAGE = "setup_error_message"
+    const val SAVE_ERROR_MESSAGE = "setup_save_error_message"
 }
 
 class SetupScreen : Screen {
@@ -113,10 +114,10 @@ internal fun SetupContent(
 
         Spacer(Modifier.height(8.dp))
 
-        if (state.hasError) {
-            SetupErrorMessage()
-        } else {
-            Spacer(Modifier.height(20.dp))
+        when {
+            state.hasError -> SetupErrorMessage()
+            state.saveError -> SetupSaveErrorMessage()
+            else -> Spacer(Modifier.height(20.dp))
         }
 
         Spacer(Modifier.height(24.dp))
@@ -186,6 +187,19 @@ private fun SetupErrorMessage() {
             .fillMaxWidth()
             .padding(start = 4.dp, top = 4.dp)
             .testTag(SetupScreenTags.ERROR_MESSAGE),
+    )
+}
+
+@Composable
+private fun SetupSaveErrorMessage() {
+    Text(
+        text = "Failed to save workout. Please try again.",
+        color = MaterialTheme.colorScheme.error,
+        style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, top = 4.dp)
+            .testTag(SetupScreenTags.SAVE_ERROR_MESSAGE),
     )
 }
 

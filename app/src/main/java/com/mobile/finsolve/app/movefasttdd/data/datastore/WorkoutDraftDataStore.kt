@@ -25,19 +25,19 @@ class WorkoutDraftDataStoreImpl @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : WorkoutDraftDataStore {
 
-    override suspend fun load(): WorkoutDraft? =
+    override suspend fun load(): WorkoutDraft? = runCatching {
         context.draftDataStore.data.map { it.toDraft() }.first()
+    }.getOrNull()
 
     override suspend fun save(draft: WorkoutDraft) {
-        context.draftDataStore.edit { it.fromDraft(draft) }
+        runCatching { context.draftDataStore.edit { it.fromDraft(draft) } }
     }
 
     override suspend fun clear() {
-        context.draftDataStore.edit { it.clear() }
+        runCatching { context.draftDataStore.edit { it.clear() } }
     }
 }
 
-// Ключи на уровне файла — доступны маперам, но скрыты снаружи
 private object DraftKeys {
     val REPS = intPreferencesKey("reps")
     val REP_DURATION = intPreferencesKey("rep_duration")

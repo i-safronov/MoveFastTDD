@@ -90,6 +90,15 @@ class TimerViewModelTest {
     }
 
     @Test
+    fun `navigates back when repository load fails`() = runTest {
+        dataStore.snapshot = null
+        repository.shouldFailOnLoad = true
+        viewModel = buildViewModel()
+        val event = viewModel.events.tryReceive()
+        Assert.assertTrue(event.getOrNull() is TimerContract.Event.NavigateBack)
+    }
+
+    @Test
     fun `navigates back when no config in repository`() = runTest {
         // @Before уже сохранил snapshot в DataStore — сбрасываем, чтобы ViewModel шёл в repository
         dataStore.snapshot = null

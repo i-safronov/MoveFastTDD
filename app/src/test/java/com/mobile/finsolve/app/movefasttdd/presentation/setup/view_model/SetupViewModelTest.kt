@@ -351,4 +351,59 @@ class SetupViewModelTest {
     }
 
     // endregion
+
+    // region Error handling
+
+    @Test
+    fun `Start with valid config sets saveError when repository fails`() = runTest {
+        repository.shouldFailOnSave = true
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
+        viewModel.dispatch(SetupContract.Executor.UpdateRepDuration(30))
+        viewModel.dispatch(SetupContract.Executor.Start)
+        Assert.assertTrue(viewModel.state.saveError)
+    }
+
+    @Test
+    fun `Start with valid config does not navigate when repository fails`() = runTest {
+        repository.shouldFailOnSave = true
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
+        viewModel.dispatch(SetupContract.Executor.Start)
+        val event = viewModel.events.tryReceive()
+        Assert.assertFalse(event.isSuccess)
+    }
+
+    @Test
+    fun `saveError is cleared when user edits any field`() = runTest {
+        repository.shouldFailOnSave = true
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
+        viewModel.dispatch(SetupContract.Executor.Start)
+        Assert.assertTrue(viewModel.state.saveError)
+
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(4))
+        Assert.assertFalse(viewModel.state.saveError)
+    }
+
+    @Test
+    fun `Start with valid config after repository failure retries save`() = runTest {
+        repository.shouldFailOnSave = true
+        viewModel.dispatch(SetupContract.Executor.UpdateReps(3))
+        viewModel.dispatch(SetupContract.Executor.Start)
+        Assert.assertTrue(viewModel.state.saveError)
+
+        repository.shouldFailOnSave = false
+        viewModel.dispatch(SetupContract.Executor.Start)
+        Assert.assertFalse(viewModel.state.saveError)
+        Assert.assertNotNull(repository.savedConfig)
+    }
+
+    @Test
+    fun `draft still loads when repository load fails`() = runTest {
+        repository.shouldFailOnLoad = true
+        draftDataStore.storedDraft = null
+        viewModel = buildViewModel()
+        Assert.assertEquals(SetupContract.DEFAULT_REPS, viewModel.state.reps)
+        Assert.assertEquals(SetupContract.DEFAULT_REP_DURATION, viewModel.state.repDuration)
+    }
+
+    // endregion
 }

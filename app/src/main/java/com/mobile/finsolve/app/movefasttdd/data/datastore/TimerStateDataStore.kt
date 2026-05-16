@@ -26,15 +26,16 @@ class TimerStateDataStoreImpl @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : TimerStateDataStore {
 
-    override suspend fun load(): TimerSnapshot? =
+    override suspend fun load(): TimerSnapshot? = runCatching {
         context.timerDataStore.data.map { it.toSnapshot() }.first()
+    }.getOrNull()
 
     override suspend fun save(snapshot: TimerSnapshot) {
-        context.timerDataStore.edit { it.fromSnapshot(snapshot) }
+        runCatching { context.timerDataStore.edit { it.fromSnapshot(snapshot) } }
     }
 
     override suspend fun clear() {
-        context.timerDataStore.edit { it.clear() }
+        runCatching { context.timerDataStore.edit { it.clear() } }
     }
 }
 
