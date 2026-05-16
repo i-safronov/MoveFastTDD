@@ -19,13 +19,6 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-// Тесты TimerContent — stateless composable без Hilt/ViewModel.
-// createAndroidComposeRule нужен для BackHandler (требует Activity).
-//
-// Тестовые данные:
-//   phases: [Work(30), Rest(10), Work(30), Finished]
-//   reps = 2
-
 @RunWith(AndroidJUnit4::class)
 class TimerScreenTest {
 

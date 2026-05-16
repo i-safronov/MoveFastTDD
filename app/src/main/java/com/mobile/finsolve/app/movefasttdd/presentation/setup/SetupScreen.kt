@@ -30,6 +30,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.OnEvent
 import com.mobile.finsolve.app.movefasttdd.presentation.setup.view_model.SetupContract
 import com.mobile.finsolve.app.movefasttdd.presentation.setup.view_model.SetupViewModel
+import com.mobile.finsolve.app.movefasttdd.presentation.timer.TimerScreen
 
 object SetupScreenTags {
     const val REPS_FIELD = "setup_reps_field"
@@ -48,9 +49,8 @@ class SetupScreen : Screen {
 
         OnEvent(viewModel.events) { event ->
             when (event) {
-                is SetupContract.Event.NavigateToTimer -> {
-                    // navigator.push(TimerScreen(event.config))
-                }
+                is SetupContract.Event.NavigateToTimer ->
+                    navigator.push(TimerScreen(event.config))
             }
         }
 
