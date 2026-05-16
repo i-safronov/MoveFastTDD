@@ -5,11 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mobile.finsolve.app.movefasttdd.domain.model.TimerPhase
@@ -27,6 +23,8 @@ class TimerScreenTest {
 
     @get:Rule
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
+
+    private val page = TimerPage(composeTestRule)
 
     // region Helpers
 
@@ -92,52 +90,49 @@ class TimerScreenTest {
     @Test
     fun workPhase_showsWorkLabel() {
         setContent(state = workState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.PHASE_LABEL).assertIsDisplayed()
-        composeTestRule.onNodeWithText("WORK").assertIsDisplayed()
+        page.assertPhaseLabelVisible().assertPhaseLabelShows("WORK")
     }
 
     @Test
     fun workPhase_showsCountdown() {
         setContent(state = workState(remainingSeconds = 30))
-        composeTestRule.onNodeWithTag(TimerScreenTags.COUNTDOWN).assertIsDisplayed()
-        composeTestRule.onNodeWithText("30").assertIsDisplayed()
+        page.assertCountdownVisible().assertCountdownShows("30")
     }
 
     @Test
     fun workPhase_showsRepCounter() {
         setContent(state = workState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.REP_COUNTER).assertIsDisplayed()
-        composeTestRule.onNodeWithText("Rep 1 of 2").assertIsDisplayed()
+        page.assertRepCounterVisible().assertRepCounterShows("Rep 1 of 2")
     }
 
     @Test
     fun workPhase_showsPauseButton_whenRunning() {
         setContent(state = workState(isRunning = true))
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
+        page.assertPauseButtonVisible()
     }
 
     @Test
     fun workPhase_showsCancelButton() {
         setContent(state = workState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).assertIsDisplayed()
+        page.assertCancelButtonVisible()
     }
 
     @Test
     fun workPhase_doesNotShowFinishedMessage() {
         setContent(state = workState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.FINISHED_MESSAGE).assertDoesNotExist()
+        page.assertFinishedMessageNotExists()
     }
 
     @Test
     fun workPhase_doesNotShowDoneButton() {
         setContent(state = workState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.DONE_BUTTON).assertDoesNotExist()
+        page.assertDoneButtonNotExists()
     }
 
     @Test
-    fun workPhase_doesNotShowResumeButton() {
+    fun workPhase_doesNotShowResumeButton_whenRunning() {
         setContent(state = workState(isRunning = true))
-        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertDoesNotExist()
+        page.assertResumeButtonNotExists()
     }
 
     // endregion
@@ -147,20 +142,19 @@ class TimerScreenTest {
     @Test
     fun restPhase_showsRestLabel() {
         setContent(state = restState())
-        composeTestRule.onNodeWithText("REST").assertIsDisplayed()
+        page.assertPhaseLabelShows("REST")
     }
 
     @Test
     fun restPhase_showsCorrectRepCounter() {
-        // index=1 (Rest) — пользователь выполнил 1 Work → Rep 1 of 2
         setContent(state = restState())
-        composeTestRule.onNodeWithText("Rep 1 of 2").assertIsDisplayed()
+        page.assertRepCounterShows("Rep 1 of 2")
     }
 
     @Test
     fun restPhase_showsRestCountdown() {
         setContent(state = restState(remainingSeconds = 7))
-        composeTestRule.onNodeWithText("7").assertIsDisplayed()
+        page.assertCountdownShows("7")
     }
 
     // endregion
@@ -170,25 +164,25 @@ class TimerScreenTest {
     @Test
     fun paused_showsResumeButton() {
         setContent(state = workState(isRunning = false))
-        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
+        page.assertResumeButtonVisible()
     }
 
     @Test
     fun paused_doesNotShowPauseButton() {
         setContent(state = workState(isRunning = false))
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertDoesNotExist()
+        page.assertPauseButtonNotExists()
     }
 
     @Test
     fun paused_stillShowsCancelButton() {
         setContent(state = workState(isRunning = false))
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).assertIsDisplayed()
+        page.assertCancelButtonVisible()
     }
 
     @Test
     fun paused_stillShowsCountdown() {
         setContent(state = workState(remainingSeconds = 15, isRunning = false))
-        composeTestRule.onNodeWithText("15").assertIsDisplayed()
+        page.assertCountdownShows("15")
     }
 
     // endregion
@@ -198,50 +192,31 @@ class TimerScreenTest {
     @Test
     fun finished_showsFinishedMessage() {
         setContent(state = finishedState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.FINISHED_MESSAGE).assertIsDisplayed()
-        composeTestRule.onNodeWithText("Workout Complete!").assertIsDisplayed()
+        page.assertFinishedScreenVisible().assertTextVisible("Workout Complete!")
     }
 
     @Test
     fun finished_showsGreatJob() {
         setContent(state = finishedState())
-        composeTestRule.onNodeWithText("Great job!").assertIsDisplayed()
+        page.assertTextVisible("Great job!")
     }
 
     @Test
     fun finished_showsDoneButton() {
         setContent(state = finishedState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.DONE_BUTTON).assertIsDisplayed()
+        page.assertDoneButtonVisible()
     }
 
     @Test
-    fun finished_doesNotShowPhaseLabel() {
+    fun finished_doesNotShowActiveTimerElements() {
         setContent(state = finishedState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.PHASE_LABEL).assertDoesNotExist()
-    }
-
-    @Test
-    fun finished_doesNotShowCountdown() {
-        setContent(state = finishedState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.COUNTDOWN).assertDoesNotExist()
-    }
-
-    @Test
-    fun finished_doesNotShowRepCounter() {
-        setContent(state = finishedState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.REP_COUNTER).assertDoesNotExist()
-    }
-
-    @Test
-    fun finished_doesNotShowPauseButton() {
-        setContent(state = finishedState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertDoesNotExist()
+        page.assertActiveTimerElementsNotVisible()
     }
 
     @Test
     fun finished_doesNotShowCancelButton() {
         setContent(state = finishedState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).assertDoesNotExist()
+        page.assertCancelButtonNotExists()
     }
 
     // endregion
@@ -251,25 +226,25 @@ class TimerScreenTest {
     @Test
     fun countdown_showsSecondsOnly_whenUnder60() {
         setContent(state = workState(remainingSeconds = 45))
-        composeTestRule.onNodeWithText("45").assertIsDisplayed()
+        page.assertCountdownShows("45")
     }
 
     @Test
     fun countdown_showsMinutesAndSeconds_whenOver60() {
         setContent(state = workState(remainingSeconds = 90))
-        composeTestRule.onNodeWithText("1:30").assertIsDisplayed()
+        page.assertCountdownShows("1:30")
     }
 
     @Test
     fun countdown_padsSeconds_whenUnder10() {
         setContent(state = workState(remainingSeconds = 65))
-        composeTestRule.onNodeWithText("1:05").assertIsDisplayed()
+        page.assertCountdownShows("1:05")
     }
 
     @Test
-    fun countdown_shows1_whenOneSecondLeft() {
+    fun countdown_showsSingleSecond_whenOneSecondLeft() {
         setContent(state = workState(remainingSeconds = 1))
-        composeTestRule.onNodeWithText("1").assertIsDisplayed()
+        page.assertCountdownShows("1")
     }
 
     // endregion
@@ -279,21 +254,19 @@ class TimerScreenTest {
     @Test
     fun repCounter_showsRep1_whenOnFirstWork() {
         setContent(state = workState(currentPhaseIndex = 0))
-        composeTestRule.onNodeWithText("Rep 1 of 2").assertIsDisplayed()
+        page.assertRepCounterShows("Rep 1 of 2")
     }
 
     @Test
     fun repCounter_showsRep2_whenOnSecondWork() {
-        // index=2 → второй Work
         setContent(state = workState(currentPhaseIndex = 2))
-        composeTestRule.onNodeWithText("Rep 2 of 2").assertIsDisplayed()
+        page.assertRepCounterShows("Rep 2 of 2")
     }
 
     @Test
     fun repCounter_showsRep1_duringRestAfterFirstWork() {
-        // index=1 → Rest (после первого Work) — текущий реп ещё 1
         setContent(state = restState())
-        composeTestRule.onNodeWithText("Rep 1 of 2").assertIsDisplayed()
+        page.assertRepCounterShows("Rep 1 of 2")
     }
 
     // endregion
@@ -301,51 +274,51 @@ class TimerScreenTest {
     // region Interactions
 
     @Test
-    fun clickingPause_invokesOnStop() {
+    fun pauseButton_click_invokesOnStop() {
         var called = false
         setContent(state = workState(isRunning = true), onStop = { called = true })
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+        page.clickPause()
         assertTrue(called)
     }
 
     @Test
-    fun clickingResume_invokesOnResume() {
+    fun resumeButton_click_invokesOnResume() {
         var called = false
         setContent(state = workState(isRunning = false), onResume = { called = true })
-        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+        page.clickResume()
         assertTrue(called)
     }
 
     @Test
-    fun clickingCancel_invokesOnCancel() {
+    fun cancelButton_click_invokesOnCancel() {
         var called = false
         setContent(state = workState(), onCancel = { called = true })
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).performClick()
+        page.clickCancel()
         assertTrue(called)
     }
 
     @Test
-    fun clickingDone_invokesOnCancel() {
+    fun doneButton_click_invokesOnCancel() {
         var called = false
         setContent(state = finishedState(), onCancel = { called = true })
-        composeTestRule.onNodeWithTag(TimerScreenTags.DONE_BUTTON).performClick()
+        page.clickDone()
         assertTrue(called)
     }
 
     @Test
-    fun clickingCancel_doesNotInvokeOnStop() {
+    fun cancelButton_click_doesNotInvokeOnStop() {
         var stopCalled = false
         setContent(state = workState(), onStop = { stopCalled = true })
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).performClick()
-        assertTrue(!stopCalled)
+        page.clickCancel()
+        assertFalse(stopCalled)
     }
 
     @Test
-    fun clickingPause_doesNotInvokeOnCancel() {
+    fun pauseButton_click_doesNotInvokeOnCancel() {
         var cancelCalled = false
         setContent(state = workState(isRunning = true), onCancel = { cancelCalled = true })
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
-        assertTrue(!cancelCalled)
+        page.clickPause()
+        assertFalse(cancelCalled)
     }
 
     // endregion
@@ -381,7 +354,7 @@ class TimerScreenTest {
         var stopCalled = false
         setContent(state = workState(isRunning = true), onStop = { stopCalled = true })
         Espresso.pressBack()
-        assertTrue(!stopCalled)
+        assertFalse(stopCalled)
     }
 
     @Test
@@ -394,7 +367,7 @@ class TimerScreenTest {
 
     // endregion
 
-    // region Configuration Change
+    // region Configuration Change (rotation)
 
     @Test
     fun rotation_workPhase_allElementsStillVisible() {
@@ -402,24 +375,17 @@ class TimerScreenTest {
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         setContent(state = workState(remainingSeconds = 25))
-
-        composeTestRule.onNodeWithTag(TimerScreenTags.PHASE_LABEL).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.COUNTDOWN).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.REP_COUNTER).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).assertIsDisplayed()
+        page.assertActiveTimerVisible()
     }
 
     @Test
     fun rotation_preservesCountdownValue() {
         setContent(state = workState(remainingSeconds = 17))
-        composeTestRule.onNodeWithText("17").assertIsDisplayed()
-
+        page.assertCountdownShows("17")
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         setContent(state = workState(remainingSeconds = 17))
-
-        composeTestRule.onNodeWithText("17").assertIsDisplayed()
+        page.assertCountdownShows("17")
     }
 
     @Test
@@ -428,8 +394,7 @@ class TimerScreenTest {
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         setContent(state = workState())
-
-        composeTestRule.onNodeWithText("WORK").assertIsDisplayed()
+        page.assertPhaseLabelShows("WORK")
     }
 
     @Test
@@ -438,97 +403,74 @@ class TimerScreenTest {
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         setContent(state = restState())
-
-        composeTestRule.onNodeWithText("REST").assertIsDisplayed()
+        page.assertPhaseLabelShows("REST")
     }
 
     @Test
     fun rotation_preservesPausedState() {
         setContent(state = workState(isRunning = false))
-        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
-
+        page.assertResumeButtonVisible()
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         setContent(state = workState(isRunning = false))
-
-        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertDoesNotExist()
+        page.assertResumeButtonVisible().assertPauseButtonNotExists()
     }
 
     @Test
     fun rotation_preservesRunningState() {
         setContent(state = workState(isRunning = true))
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
-
+        page.assertPauseButtonVisible()
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         setContent(state = workState(isRunning = true))
-
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertDoesNotExist()
+        page.assertPauseButtonVisible().assertResumeButtonNotExists()
     }
 
     @Test
     fun rotation_preservesFinishedState() {
         setContent(state = finishedState())
-        composeTestRule.onNodeWithTag(TimerScreenTags.FINISHED_MESSAGE).assertIsDisplayed()
-
+        page.assertFinishedMessageVisible()
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         setContent(state = finishedState())
-
-        composeTestRule.onNodeWithTag(TimerScreenTags.FINISHED_MESSAGE).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.DONE_BUTTON).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertDoesNotExist()
+        page.assertFinishedScreenVisible().assertPauseButtonNotExists()
     }
 
     @Test
-    fun rotation_cancelButtonStillCallsOnCancel() {
+    fun rotation_cancelButton_stillCallsOnCancel() {
         var cancelCalled = false
         fun content() {
             composeTestRule.setContent {
                 BackHandler { cancelCalled = true }
-                TimerContent(
-                    state = workState(),
-                    onStop = {},
-                    onResume = {},
-                    onCancel = { cancelCalled = true },
-                )
+                TimerContent(state = workState(), onStop = {}, onResume = {}, onCancel = { cancelCalled = true })
             }
         }
         content()
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         content()
-
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).performClick()
+        page.clickCancel()
         assertTrue(cancelCalled)
     }
 
     @Test
-    fun rotation_pauseButtonStillCallsOnStop() {
+    fun rotation_pauseButton_stillCallsOnStop() {
         var stopCalled = false
         fun content() {
             composeTestRule.setContent {
-                TimerContent(
-                    state = workState(isRunning = true),
-                    onStop = { stopCalled = true },
-                    onResume = {},
-                    onCancel = {},
-                )
+                TimerContent(state = workState(isRunning = true), onStop = { stopCalled = true }, onResume = {}, onCancel = {})
             }
         }
         content()
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         content()
-
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+        page.clickPause()
         assertTrue(stopCalled)
     }
 
     @Test
-    fun rotation_mutableState_survives() {
+    fun rotation_mutableState_survivesRecreation() {
         var isRunning by mutableStateOf(true)
         fun content() {
             composeTestRule.setContent {
@@ -540,9 +482,8 @@ class TimerScreenTest {
                 )
             }
         }
-
         content()
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+        page.clickPause()
         composeTestRule.waitForIdle()
         assertFalse(isRunning)
 
@@ -550,26 +491,19 @@ class TimerScreenTest {
         composeTestRule.waitForIdle()
         content()
 
-        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertDoesNotExist()
+        page.assertResumeButtonVisible().assertPauseButtonNotExists()
     }
 
     @Test
     fun multipleRotations_uiRemainsStable() {
-        fun content() {
-            setContent(state = workState(remainingSeconds = 42))
-        }
+        fun content() { setContent(state = workState(remainingSeconds = 42)) }
         content()
-
         repeat(3) {
             composeTestRule.activityRule.scenario.recreate()
             composeTestRule.waitForIdle()
             content()
         }
-
-        composeTestRule.onNodeWithText("42").assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.PHASE_LABEL).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).assertIsDisplayed()
+        page.assertCountdownShows("42").assertPhaseLabelVisible().assertCancelButtonVisible()
     }
 
     // endregion
@@ -580,16 +514,9 @@ class TimerScreenTest {
     fun rapidPause_callsOnStop_eachTime() {
         var stopCount = 0
         composeTestRule.setContent {
-            TimerContent(
-                state = workState(isRunning = true),
-                onStop = { stopCount++ },
-                onResume = {},
-                onCancel = {},
-            )
+            TimerContent(state = workState(isRunning = true), onStop = { stopCount++ }, onResume = {}, onCancel = {})
         }
-        repeat(10) {
-            composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
-        }
+        repeat(10) { page.clickPause() }
         assertEquals(10, stopCount)
     }
 
@@ -597,16 +524,9 @@ class TimerScreenTest {
     fun rapidResume_callsOnResume_eachTime() {
         var resumeCount = 0
         composeTestRule.setContent {
-            TimerContent(
-                state = workState(isRunning = false),
-                onStop = {},
-                onResume = { resumeCount++ },
-                onCancel = {},
-            )
+            TimerContent(state = workState(isRunning = false), onStop = {}, onResume = { resumeCount++ }, onCancel = {})
         }
-        repeat(10) {
-            composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
-        }
+        repeat(10) { page.clickResume() }
         assertEquals(10, resumeCount)
     }
 
@@ -622,14 +542,11 @@ class TimerScreenTest {
             )
         }
         repeat(9) {
-            if (isRunning) composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON)
-                .performClick()
-            else composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            if (isRunning) page.clickPause() else page.clickResume()
             composeTestRule.waitForIdle()
         }
-
         assertFalse(isRunning)
-        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
+        page.assertResumeButtonVisible()
     }
 
     @Test
@@ -643,20 +560,16 @@ class TimerScreenTest {
                 onCancel = {},
             )
         }
-        
         repeat(10) {
-            if (isRunning) composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON)
-                .performClick()
-            else composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            if (isRunning) page.clickPause() else page.clickResume()
             composeTestRule.waitForIdle()
         }
-
         assertTrue(isRunning)
-        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
+        page.assertPauseButtonVisible()
     }
 
     @Test
-    fun rapidAlternation_correctButtonShownAfterEachTap() {
+    fun rapidAlternation_correctButtonShown_afterEachTap() {
         var isRunning by mutableStateOf(true)
         composeTestRule.setContent {
             TimerContent(
@@ -668,15 +581,13 @@ class TimerScreenTest {
         }
         repeat(6) {
             if (isRunning) {
-                composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
-                    .performClick()
+                page.assertPauseButtonVisible().clickPause()
                 composeTestRule.waitForIdle()
-                composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
+                page.assertResumeButtonVisible()
             } else {
-                composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
-                    .performClick()
+                page.assertResumeButtonVisible().clickResume()
                 composeTestRule.waitForIdle()
-                composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
+                page.assertPauseButtonVisible()
             }
         }
     }
@@ -693,23 +604,15 @@ class TimerScreenTest {
             )
         }
         repeat(8) {
-            if (isRunning) composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON)
-                .performClick()
-            else composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            if (isRunning) page.clickPause() else page.clickResume()
             composeTestRule.waitForIdle()
-
-            if (isRunning) {
-                composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertDoesNotExist()
-                composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
-            } else {
-                composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertDoesNotExist()
-                composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
-            }
+            if (isRunning) page.assertResumeButtonNotExists().assertPauseButtonVisible()
+            else page.assertPauseButtonNotExists().assertResumeButtonVisible()
         }
     }
 
     @Test
-    fun cancelButton_alwaysVisible_duringRapidTaps() {
+    fun rapidTaps_cancelButtonAlwaysVisible() {
         var isRunning by mutableStateOf(true)
         composeTestRule.setContent {
             TimerContent(
@@ -720,10 +623,8 @@ class TimerScreenTest {
             )
         }
         repeat(10) {
-            composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).assertIsDisplayed()
-            if (isRunning) composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON)
-                .performClick()
-            else composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            page.assertCancelButtonVisible()
+            if (isRunning) page.clickPause() else page.clickResume()
             composeTestRule.waitForIdle()
         }
     }
@@ -741,12 +642,12 @@ class TimerScreenTest {
             )
         }
         repeat(3) {
-            composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+            page.clickPause()
             composeTestRule.waitForIdle()
-            composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            page.clickResume()
             composeTestRule.waitForIdle()
         }
-        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).performClick()
+        page.clickCancel()
         assertTrue(cancelCalled)
     }
 
