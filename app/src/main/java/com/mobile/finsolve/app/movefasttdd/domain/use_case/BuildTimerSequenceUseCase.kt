@@ -2,8 +2,9 @@ package com.mobile.finsolve.app.movefasttdd.domain.use_case
 
 import com.mobile.finsolve.app.movefasttdd.domain.model.TimerPhase
 import com.mobile.finsolve.app.movefasttdd.domain.model.WorkoutConfig
+import javax.inject.Inject
 
-class BuildTimerSequenceUseCase {
+class BuildTimerSequenceUseCase @Inject constructor() {
 
     operator fun invoke(config: WorkoutConfig): List<TimerPhase> {
         val mutableList = mutableListOf<TimerPhase>()
