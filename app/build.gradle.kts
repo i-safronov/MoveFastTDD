@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+    implementation(libs.datastore)
     implementation(libs.voyager.navigator)
     implementation(libs.voyager.screenmodel)
     implementation(libs.voyager.hilt)
