@@ -1,4 +1,4 @@
-package com.mobile.finsolve.app.movefasttdd.presentation.setup
+package com.mobile.finsolve.app.movefasttdd.presentation.setup.view_model
 
 import com.mobile.finsolve.app.movefasttdd.core.dispatchers.DispatchersList
 import com.mobile.finsolve.app.movefasttdd.domain.model.ValidationResult
@@ -9,6 +9,8 @@ import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.APEXViewM
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.Apex
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.EffectorScope
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.ExecutorScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
 
 object SetupContract {
 
@@ -16,8 +18,12 @@ object SetupContract {
         val reps: Int = 3,
         val repDuration: Int = 30,
         val restDuration: Int = 10,
-        val isError: Boolean = false,
-    ) : Apex.State
+        val repsError: Boolean = false,
+        val repDurationError: Boolean = false,
+        val restDurationError: Boolean = false,
+    ) : Apex.State {
+        val hasError: Boolean get() = repsError || repDurationError || restDurationError
+    }
 
     sealed interface Executor : Apex.Executor {
         data class UpdateReps(val value: Int) : Executor
@@ -39,10 +45,11 @@ object SetupContract {
     }
 }
 
-class SetupViewModel(
+@HiltViewModel
+class SetupViewModel @Inject constructor(
     private val repository: WorkoutConfigRepository,
     private val validate: ValidateWorkoutConfigUseCase,
-    dispatchers: DispatchersList = DispatchersList.Base(),
+    dispatchers: DispatchersList,
 ) : APEXViewModel<SetupContract.State, SetupContract.Executor, SetupContract.Effect, SetupContract.Event>(
     initState = SetupContract.State(),
     dispatchers = dispatchers,
@@ -66,30 +73,30 @@ class SetupViewModel(
                 state.copy(
                     reps = it.reps,
                     repDuration = it.repDuration,
-                    restDuration = it.restDuration
+                    restDuration = it.restDuration,
                 )
-            }
-                ?: state
+            } ?: state
 
-        SetupContract.Executor.Start -> when (validate(currentConfig())) {
-            ValidationResult.Invalid -> state.copy(isError = true)
+        SetupContract.Executor.Start -> when (val result = validate(currentConfig())) {
+            is ValidationResult.Invalid -> state.copy(
+                repsError = result.repsError,
+                repDurationError = result.repDurationError,
+                restDurationError = result.restDurationError,
+            )
             ValidationResult.Valid -> {
                 sendEffect(SetupContract.Effect.SaveConfig(currentConfig()))
                 state
             }
         }
 
-        is SetupContract.Executor.UpdateReps -> state.copy(reps = ex.value, isError = false)
+        is SetupContract.Executor.UpdateReps ->
+            state.copy(reps = ex.value, repsError = false)
 
-        is SetupContract.Executor.UpdateRepDuration -> state.copy(
-            repDuration = ex.value,
-            isError = false
-        )
+        is SetupContract.Executor.UpdateRepDuration ->
+            state.copy(repDuration = ex.value, repDurationError = false)
 
-        is SetupContract.Executor.UpdateRestDuration -> state.copy(
-            restDuration = ex.value,
-            isError = false
-        )
+        is SetupContract.Executor.UpdateRestDuration ->
+            state.copy(restDuration = ex.value, restDurationError = false)
 
         is SetupContract.Executor.ConfigSaved -> {
             sendEvent(SetupContract.Event.NavigateToTimer(ex.config))
