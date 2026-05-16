@@ -10,7 +10,7 @@ import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.Apex
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.EffectorScope
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.ExecutorScope
 
-data object SetupContract {
+object SetupContract {
 
     data class State(
         val reps: Int = 3,
@@ -19,104 +19,99 @@ data object SetupContract {
         val isError: Boolean = false,
     ) : Apex.State
 
-    sealed interface SetupExecutor : Apex.Executor {
-        data class UpdateReps(val value: Int) : SetupExecutor
-        data class UpdateRepDuration(val value: Int) : SetupExecutor
-        data class UpdateRestDuration(val value: Int) : SetupExecutor
-        data object Start : SetupExecutor
-        data object LoadConfig : SetupExecutor
-        data class ConfigLoaded(val config: WorkoutConfig?) : SetupExecutor
-        data class ConfigSaved(val config: WorkoutConfig) : SetupExecutor
+    sealed interface Executor : Apex.Executor {
+        data class UpdateReps(val value: Int) : Executor
+        data class UpdateRepDuration(val value: Int) : Executor
+        data class UpdateRestDuration(val value: Int) : Executor
+        data object Start : Executor
+        data object LoadConfig : Executor
+        data class ConfigLoaded(val config: WorkoutConfig?) : Executor
+        data class ConfigSaved(val config: WorkoutConfig) : Executor
     }
 
-    sealed interface SetupEvent : Apex.Event {
-        data class NavigateToTimer(val config: WorkoutConfig) : SetupEvent
+    sealed interface Event : Apex.Event {
+        data class NavigateToTimer(val config: WorkoutConfig) : Event
     }
 
-    sealed interface SetupEffect : Apex.Effect {
-        data object LoadConfig : SetupEffect
-        data class SaveConfig(val config: WorkoutConfig) : SetupEffect
+    sealed interface Effect : Apex.Effect {
+        data object LoadConfig : Effect
+        data class SaveConfig(val config: WorkoutConfig) : Effect
     }
-
 }
 
 class SetupViewModel(
     private val repository: WorkoutConfigRepository,
     private val validate: ValidateWorkoutConfigUseCase,
     dispatchers: DispatchersList = DispatchersList.Base(),
-) : APEXViewModel<SetupContract.State, SetupContract.SetupExecutor, SetupContract.SetupEffect, SetupContract.SetupEvent>(
+) : APEXViewModel<SetupContract.State, SetupContract.Executor, SetupContract.Effect, SetupContract.Event>(
     initState = SetupContract.State(),
     dispatchers = dispatchers,
 ) {
 
     init {
-        dispatch(SetupContract.SetupExecutor.LoadConfig)
+        dispatch(SetupContract.Executor.LoadConfig)
     }
 
-    override suspend fun ExecutorScope<SetupContract.SetupEffect, SetupContract.SetupEvent>.execute(
-        ex: SetupContract.SetupExecutor
+    override suspend fun ExecutorScope<SetupContract.Effect, SetupContract.Event>.execute(
+        ex: SetupContract.Executor,
     ): SetupContract.State = when (ex) {
-        SetupContract.SetupExecutor.LoadConfig -> {
-            sendEffect(SetupContract.SetupEffect.LoadConfig)
+
+        SetupContract.Executor.LoadConfig -> {
+            sendEffect(SetupContract.Effect.LoadConfig)
             state
         }
 
-        is SetupContract.SetupExecutor.ConfigLoaded -> {
-            val config = ex.config ?: return@execute state
-            state.copy(
-                reps = config.reps,
-                repDuration = config.repDuration,
-                restDuration = config.restDuration,
-            )
-        }
-
-        SetupContract.SetupExecutor.Start -> {
-            val config = WorkoutConfig(
-                reps = state.reps,
-                repDuration = state.repDuration,
-                restDuration = state.restDuration
-            )
-            when (
-                validate(
-                    config
+        is SetupContract.Executor.ConfigLoaded ->
+            ex.config?.let {
+                state.copy(
+                    reps = it.reps,
+                    repDuration = it.repDuration,
+                    restDuration = it.restDuration
                 )
-            ) {
-                ValidationResult.Invalid -> state.copy(isError = true)
+            }
+                ?: state
 
-                ValidationResult.Valid -> {
-                    sendEffect(SetupContract.SetupEffect.SaveConfig(config = config))
-                    state
-                }
+        SetupContract.Executor.Start -> when (validate(currentConfig())) {
+            ValidationResult.Invalid -> state.copy(isError = true)
+            ValidationResult.Valid -> {
+                sendEffect(SetupContract.Effect.SaveConfig(currentConfig()))
+                state
             }
         }
 
-        is SetupContract.SetupExecutor.UpdateReps ->
-            state.copy(reps = ex.value, isError = false)
+        is SetupContract.Executor.UpdateReps -> state.copy(reps = ex.value, isError = false)
 
-        is SetupContract.SetupExecutor.UpdateRepDuration ->
-            state.copy(repDuration = ex.value, isError = false)
+        is SetupContract.Executor.UpdateRepDuration -> state.copy(
+            repDuration = ex.value,
+            isError = false
+        )
 
-        is SetupContract.SetupExecutor.UpdateRestDuration ->
-            state.copy(restDuration = ex.value, isError = false)
+        is SetupContract.Executor.UpdateRestDuration -> state.copy(
+            restDuration = ex.value,
+            isError = false
+        )
 
-        is SetupContract.SetupExecutor.ConfigSaved -> {
-            sendEvent(SetupContract.SetupEvent.NavigateToTimer(config = ex.config))
+        is SetupContract.Executor.ConfigSaved -> {
+            sendEvent(SetupContract.Event.NavigateToTimer(ex.config))
             state
         }
     }
 
-    override suspend fun EffectorScope<SetupContract.SetupExecutor>.affect(
-        ef: SetupContract.SetupEffect
+    override suspend fun EffectorScope<SetupContract.Executor>.affect(
+        ef: SetupContract.Effect,
     ) = when (ef) {
-        SetupContract.SetupEffect.LoadConfig -> {
-            val config = repository.load()
-            dispatch(SetupContract.SetupExecutor.ConfigLoaded(config))
-        }
+        SetupContract.Effect.LoadConfig ->
+            dispatch(SetupContract.Executor.ConfigLoaded(repository.load()))
 
-        is SetupContract.SetupEffect.SaveConfig -> {
+        is SetupContract.Effect.SaveConfig -> {
             repository.save(ef.config)
-            dispatch(SetupContract.SetupExecutor.ConfigSaved(ef.config))
+            dispatch(SetupContract.Executor.ConfigSaved(ef.config))
         }
     }
 
+    private fun currentConfig() = WorkoutConfig(
+        reps = state.reps,
+        repDuration = state.repDuration,
+        restDuration = state.restDuration,
+    )
 }

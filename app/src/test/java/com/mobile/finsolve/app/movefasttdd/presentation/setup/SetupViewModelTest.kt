@@ -4,7 +4,7 @@ import com.mobile.finsolve.app.movefasttdd.core.dispatchers.DispatchersList
 import com.mobile.finsolve.app.movefasttdd.domain.model.WorkoutConfig
 import com.mobile.finsolve.app.movefasttdd.domain.use_case.ValidateWorkoutConfigUseCase
 import com.mobile.finsolve.app.movefasttdd.domain.usecase.FakeWorkoutConfigRepository
-import com.mobile.finsolve.app.movefasttdd.presentation.setup.SetupContract.SetupExecutor.*
+import com.mobile.finsolve.app.movefasttdd.presentation.setup.SetupContract.Executor.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -177,7 +177,7 @@ class SetupViewModelTest {
 
         val event = viewModel.events.tryReceive()
         assertTrue(event.isSuccess)
-        assertTrue(event.getOrNull() is SetupContract.SetupEvent.NavigateToTimer)
+        assertTrue(event.getOrNull() is SetupContract.Event.NavigateToTimer)
     }
 
     @Test
@@ -213,7 +213,7 @@ class SetupViewModelTest {
         viewModel.dispatch(Start)
         advanceUntilIdle()
 
-        val event = viewModel.events.tryReceive().getOrNull() as? SetupContract.SetupEvent.NavigateToTimer
+        val event = viewModel.events.tryReceive().getOrNull() as? SetupContract.Event.NavigateToTimer
         assertNotNull(event)
         assertEquals(WorkoutConfig(reps = 5, repDuration = 45, restDuration = 20), event?.config)
     }
