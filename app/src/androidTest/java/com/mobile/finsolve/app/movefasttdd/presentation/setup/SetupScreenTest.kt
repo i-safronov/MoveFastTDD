@@ -4,20 +4,11 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextClearance
-import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mobile.finsolve.app.movefasttdd.presentation.setup.view_model.SetupContract
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -29,8 +20,7 @@ class SetupScreenTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
-    private val hasError = SemanticsMatcher.keyIsDefined(SemanticsProperties.Error)
-    private val hasNoError = SemanticsMatcher.keyNotDefined(SemanticsProperties.Error)
+    private val page = SetupPage(composeTestRule)
 
     private fun setContent(
         state: SetupContract.State = SetupContract.State(),
@@ -55,31 +45,31 @@ class SetupScreenTest {
     @Test
     fun repsField_isDisplayed() {
         setContent()
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assertIsDisplayed()
+        page.assertRepsFieldVisible()
     }
 
     @Test
     fun repDurationField_isDisplayed() {
         setContent()
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assertIsDisplayed()
+        page.assertRepDurationFieldVisible()
     }
 
     @Test
     fun restDurationField_isDisplayed() {
         setContent()
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assertIsDisplayed()
+        page.assertRestDurationFieldVisible()
     }
 
     @Test
     fun startButton_isDisplayed() {
         setContent()
-        composeTestRule.onNodeWithTag(SetupScreenTags.START_BUTTON).assertIsDisplayed()
+        page.assertStartButtonVisible()
     }
 
     @Test
     fun title_isDisplayed() {
         setContent()
-        composeTestRule.onNodeWithText("Interval Timer").assertIsDisplayed()
+        page.assertTitleVisible()
     }
 
     // endregion
@@ -89,25 +79,25 @@ class SetupScreenTest {
     @Test
     fun errorMessage_isNotDisplayed_whenNoErrors() {
         setContent(state = SetupContract.State())
-        composeTestRule.onNodeWithTag(SetupScreenTags.ERROR_MESSAGE).assertIsNotDisplayed()
+        page.assertErrorMessageHidden()
     }
 
     @Test
     fun errorMessage_isDisplayed_whenRepsError() {
         setContent(state = SetupContract.State(repsError = true))
-        composeTestRule.onNodeWithTag(SetupScreenTags.ERROR_MESSAGE).assertIsDisplayed()
+        page.assertErrorMessageVisible()
     }
 
     @Test
     fun errorMessage_isDisplayed_whenRepDurationError() {
         setContent(state = SetupContract.State(repDurationError = true))
-        composeTestRule.onNodeWithTag(SetupScreenTags.ERROR_MESSAGE).assertIsDisplayed()
+        page.assertErrorMessageVisible()
     }
 
     @Test
     fun errorMessage_isDisplayed_whenRestDurationError() {
         setContent(state = SetupContract.State(restDurationError = true))
-        composeTestRule.onNodeWithTag(SetupScreenTags.ERROR_MESSAGE).assertIsDisplayed()
+        page.assertErrorMessageVisible()
     }
 
     // endregion
@@ -117,73 +107,67 @@ class SetupScreenTest {
     @Test
     fun repsField_hasError_whenRepsErrorIsTrue() {
         setContent(state = SetupContract.State(repsError = true))
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
+        page.assertRepsHasError()
     }
 
     @Test
     fun repsField_hasNoError_whenRepsErrorIsFalse() {
         setContent(state = SetupContract.State(repsError = false))
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasNoError)
+        page.assertRepsHasNoError()
     }
 
     @Test
     fun repDurationField_hasError_whenRepDurationErrorIsTrue() {
         setContent(state = SetupContract.State(repDurationError = true))
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assert(hasError)
+        page.assertRepDurationHasError()
     }
 
     @Test
     fun repDurationField_hasNoError_whenRepDurationErrorIsFalse() {
         setContent(state = SetupContract.State(repDurationError = false))
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assert(hasNoError)
+        page.assertRepDurationHasNoError()
     }
 
     @Test
     fun restDurationField_hasError_whenRestDurationErrorIsTrue() {
         setContent(state = SetupContract.State(restDurationError = true))
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assert(hasError)
+        page.assertRestDurationHasError()
     }
 
     @Test
     fun restDurationField_hasNoError_whenRestDurationErrorIsFalse() {
         setContent(state = SetupContract.State(restDurationError = false))
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assert(hasNoError)
+        page.assertRestDurationHasNoError()
     }
 
     @Test
     fun onlyRepsField_hasError_whenOnlyRepsErrorIsTrue() {
         setContent(state = SetupContract.State(repsError = true))
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assert(hasNoError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assert(hasNoError)
+        page.assertRepsHasError()
+            .assertRepDurationHasNoError()
+            .assertRestDurationHasNoError()
     }
 
     @Test
     fun onlyRepDurationField_hasError_whenOnlyRepDurationErrorIsTrue() {
         setContent(state = SetupContract.State(repDurationError = true))
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasNoError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assert(hasError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assert(hasNoError)
+        page.assertRepsHasNoError()
+            .assertRepDurationHasError()
+            .assertRestDurationHasNoError()
     }
 
     @Test
     fun multipleFields_haveErrors_whenMultipleErrorsAreTrue() {
         setContent(state = SetupContract.State(repsError = true, repDurationError = true))
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assert(hasError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assert(hasNoError)
+        page.assertRepsHasError()
+            .assertRepDurationHasError()
+            .assertRestDurationHasNoError()
     }
 
     @Test
     fun noFields_haveErrors_whenStateHasNoErrors() {
         setContent(state = SetupContract.State())
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasNoError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assert(hasNoError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assert(hasNoError)
+        page.assertNoFieldsHaveErrors()
     }
 
     // endregion
@@ -194,9 +178,7 @@ class SetupScreenTest {
     fun clickingStartButton_invokesOnStart() {
         var startCalled = false
         setContent(onStart = { startCalled = true })
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.START_BUTTON).performClick()
-
+        page.clickStart()
         assertTrue(startCalled)
     }
 
@@ -207,12 +189,7 @@ class SetupScreenTest {
             state = SetupContract.State(reps = 0),
             onRepsChange = { capturedValue = it },
         )
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).apply {
-            performTextClearance()
-            performTextInput("5")
-        }
-
+        page.typeReps("5")
         assertEquals(5, capturedValue)
     }
 
@@ -223,12 +200,7 @@ class SetupScreenTest {
             state = SetupContract.State(repDuration = 0),
             onRepDurationChange = { capturedValue = it },
         )
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).apply {
-            performTextClearance()
-            performTextInput("45")
-        }
-
+        page.typeRepDuration("45")
         assertEquals(45, capturedValue)
     }
 
@@ -239,12 +211,7 @@ class SetupScreenTest {
             state = SetupContract.State(restDuration = 0),
             onRestDurationChange = { capturedValue = it },
         )
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).apply {
-            performTextClearance()
-            performTextInput("10")
-        }
-
+        page.typeRestDuration("10")
         assertEquals(10, capturedValue)
     }
 
@@ -255,19 +222,13 @@ class SetupScreenTest {
             state = SetupContract.State(reps = 0),
             onRepsChange = { capturedValue = it },
         )
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).apply {
-            performTextClearance()
-            performTextInput("abc")
-        }
-
-        // Буквы фильтруются — пустая строка не конвертируется в Int, колбэк не вызван
+        page.typeReps("abc")
         assertEquals(null, capturedValue)
     }
 
     // endregion
 
-    // region Configuration Change
+    // region Configuration Change (rotation)
 
     @Test
     fun rotation_allFieldsStillVisible() {
@@ -275,11 +236,7 @@ class SetupScreenTest {
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         setContent()
-
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assertIsDisplayed()
-        composeTestRule.onNodeWithTag(SetupScreenTags.START_BUTTON).assertIsDisplayed()
+        page.assertAllFieldsVisible()
     }
 
     @Test
@@ -297,17 +254,14 @@ class SetupScreenTest {
             }
         }
         content()
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).apply {
-            performTextClearance()
-            performTextInput("7")
-        }
+        page.typeReps("7")
         assertEquals(7, reps)
 
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         content()
 
-        composeTestRule.onNodeWithText("7").assertIsDisplayed()
+        page.assertCountdownText("7")
     }
 
     @Test
@@ -324,14 +278,13 @@ class SetupScreenTest {
             }
         }
         content(repsError = true)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
+        page.assertRepsHasError()
 
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         content(repsError = true)
 
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assert(hasNoError)
+        page.assertRepsHasError().assertRepDurationHasNoError()
     }
 
     @Test
@@ -348,13 +301,13 @@ class SetupScreenTest {
             }
         }
         content()
-        composeTestRule.onNodeWithTag(SetupScreenTags.ERROR_MESSAGE).assertIsNotDisplayed()
+        page.assertErrorMessageHidden()
 
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
         content()
 
-        composeTestRule.onNodeWithTag(SetupScreenTags.ERROR_MESSAGE).assertIsNotDisplayed()
+        page.assertErrorMessageHidden()
     }
 
     @Test
@@ -376,12 +329,12 @@ class SetupScreenTest {
         composeTestRule.waitForIdle()
         content()
 
-        composeTestRule.onNodeWithTag(SetupScreenTags.START_BUTTON).performClick()
+        page.clickStart()
         assertTrue(startCalled)
     }
 
     @Test
-    fun landscapeToPortrait_multipleRotations_uiStaysCorrect() {
+    fun multipleRotations_uiStaysCorrect() {
         fun content(repsError: Boolean = false) {
             composeTestRule.setContent {
                 SetupContent(
@@ -401,8 +354,7 @@ class SetupScreenTest {
             content(repsError = true)
         }
 
-        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
-        composeTestRule.onNodeWithTag(SetupScreenTags.START_BUTTON).assertIsDisplayed()
+        page.assertRepsHasError().assertStartButtonVisible()
     }
 
     // endregion
