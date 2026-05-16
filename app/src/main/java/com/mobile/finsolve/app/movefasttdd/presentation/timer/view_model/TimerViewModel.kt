@@ -25,6 +25,23 @@ object TimerContract {
     ) : Apex.State {
         val currentPhase: TimerPhase
             get() = phases.getOrElse(currentPhaseIndex) { TimerPhase.Finished }
+
+        val currentRep: Int
+            get() = phases.take(currentPhaseIndex + 1).count { it is TimerPhase.Work }
+
+        val totalReps: Int
+            get() = config?.reps ?: phases.count { it is TimerPhase.Work }
+
+        val phaseDuration: Int
+            get() = when (val p = currentPhase) {
+                is TimerPhase.Work -> p.duration
+                is TimerPhase.Rest -> p.duration
+                TimerPhase.Finished -> 0
+            }
+
+        val progress: Float
+            get() = if (phaseDuration == 0) 1f
+            else (phaseDuration - remainingSeconds).toFloat() / phaseDuration
     }
 
     sealed interface Executor : Apex.Executor {
@@ -32,9 +49,9 @@ object TimerContract {
         data class StateLoaded(val snapshot: TimerSnapshot?) : Executor
         data class Init(val config: WorkoutConfig) : Executor
         data object Tick : Executor
-        data object Stop : Executor   // пауза — таймер встаёт, экран остаётся
-        data object Resume : Executor // продолжить после паузы
-        data object Cancel : Executor // выход — очищаем DataStore, навигация назад
+        data object Stop : Executor
+        data object Resume : Executor
+        data object Cancel : Executor
     }
 
     sealed interface Event : Apex.Event {
@@ -75,7 +92,8 @@ class TimerViewModel @Inject constructor(
 
         is TimerContract.Executor.StateLoaded ->
             ex.snapshot?.let { snapshot ->
-                val config = WorkoutConfig(snapshot.reps, snapshot.repDuration, snapshot.restDuration)
+                val config =
+                    WorkoutConfig(snapshot.reps, snapshot.repDuration, snapshot.restDuration)
                 val phases = buildTimerSequence(config)
                 sendEffect(TimerContract.Effect.StartTimer)
                 state.copy(
@@ -90,15 +108,17 @@ class TimerViewModel @Inject constructor(
         is TimerContract.Executor.Init -> {
             val phases = buildTimerSequence(ex.config)
             val firstDuration = phases.first().durationOrZero
-            sendEffect(TimerContract.Effect.SaveState(
-                TimerSnapshot(
-                    reps = ex.config.reps,
-                    repDuration = ex.config.repDuration,
-                    restDuration = ex.config.restDuration,
-                    phaseIndex = 0,
-                    remainingSeconds = firstDuration,
+            sendEffect(
+                TimerContract.Effect.SaveState(
+                    TimerSnapshot(
+                        reps = ex.config.reps,
+                        repDuration = ex.config.repDuration,
+                        restDuration = ex.config.restDuration,
+                        phaseIndex = 0,
+                        remainingSeconds = firstDuration,
+                    )
                 )
-            ))
+            )
             sendEffect(TimerContract.Effect.StartTimer)
             state.copy(
                 config = ex.config,
