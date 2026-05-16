@@ -10,11 +10,15 @@
         <option name="selectionMode" value="DROPDOWN" />
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="Tests in 'com'">
+      <SelectionState runConfigName="TimerScreenTest">
         <option name="selectionMode" value="DROPDOWN" />
         <DialogSelection />
       </SelectionState>
-      <SelectionState runConfigName="TimerScreenTest">
+      <SelectionState runConfigName="TimerRapidTapTest">
+        <option name="selectionMode" value="DROPDOWN" />
+        <DialogSelection />
+      </SelectionState>
+      <SelectionState runConfigName="Tests in 'com'">
         <option name="selectionMode" value="DROPDOWN" />
         <DialogSelection />
       </SelectionState>

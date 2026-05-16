@@ -5,6 +5,7 @@ import com.mobile.finsolve.app.movefasttdd.data.datastore.TimerSnapshot
 import com.mobile.finsolve.app.movefasttdd.data.datastore.TimerStateDataStore
 import com.mobile.finsolve.app.movefasttdd.domain.model.TimerPhase
 import com.mobile.finsolve.app.movefasttdd.domain.model.WorkoutConfig
+import com.mobile.finsolve.app.movefasttdd.domain.repository.WorkoutConfigRepository
 import com.mobile.finsolve.app.movefasttdd.domain.use_case.BuildTimerSequenceUseCase
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.APEXViewModel
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.Apex
@@ -17,6 +18,7 @@ import javax.inject.Inject
 object TimerContract {
 
     data class State(
+        val isLoading: Boolean = true,
         val config: WorkoutConfig? = null,
         val phases: List<TimerPhase> = emptyList(),
         val currentPhaseIndex: Int = 0,
@@ -47,7 +49,7 @@ object TimerContract {
     sealed interface Executor : Apex.Executor {
         data object Load : Executor
         data class StateLoaded(val snapshot: TimerSnapshot?) : Executor
-        data class Init(val config: WorkoutConfig) : Executor
+        data class ConfigLoaded(val config: WorkoutConfig?) : Executor
         data object Tick : Executor
         data object Stop : Executor
         data object Resume : Executor
@@ -61,9 +63,10 @@ object TimerContract {
 
     sealed interface Effect : Apex.Effect {
         data object LoadState : Effect
+        data object LoadConfig : Effect
         data class SaveState(val snapshot: TimerSnapshot) : Effect
         data object ClearState : Effect
-        data object StartTimer : Effect
+        data class StartTimer(val generation: Int) : Effect
     }
 }
 
@@ -71,14 +74,24 @@ object TimerContract {
 class TimerViewModel @Inject constructor(
     private val buildTimerSequence: BuildTimerSequenceUseCase,
     private val timerStateDataStore: TimerStateDataStore,
+    private val workoutConfigRepository: WorkoutConfigRepository,
     dispatchers: DispatchersList,
 ) : APEXViewModel<TimerContract.State, TimerContract.Executor, TimerContract.Effect, TimerContract.Event>(
     initState = TimerContract.State(),
     dispatchers = dispatchers,
 ) {
 
+    // Каждый новый запуск таймера получает уникальный номер поколения.
+    // Старые корутины StartTimer видят что их generation устарел и выходят из цикла.
+    private var timerGeneration = 0
+
     init {
         dispatch(TimerContract.Executor.Load)
+    }
+
+    private fun ExecutorScope<TimerContract.Effect, TimerContract.Event>.startTimer() {
+        timerGeneration++
+        sendEffect(TimerContract.Effect.StartTimer(timerGeneration))
     }
 
     override suspend fun ExecutorScope<TimerContract.Effect, TimerContract.Event>.execute(
@@ -92,36 +105,45 @@ class TimerViewModel @Inject constructor(
 
         is TimerContract.Executor.StateLoaded ->
             ex.snapshot?.let { snapshot ->
-                val config =
-                    WorkoutConfig(snapshot.reps, snapshot.repDuration, snapshot.restDuration)
+                val config = WorkoutConfig(snapshot.reps, snapshot.repDuration, snapshot.restDuration)
                 val phases = buildTimerSequence(config)
-                sendEffect(TimerContract.Effect.StartTimer)
+                if (snapshot.isRunning) startTimer()
                 state.copy(
+                    isLoading = false,
                     config = config,
                     phases = phases,
                     currentPhaseIndex = snapshot.phaseIndex,
                     remainingSeconds = snapshot.remainingSeconds,
+                    isRunning = snapshot.isRunning,
+                )
+            } ?: run {
+                // Нет активной тренировки — грузим последний конфиг из Room
+                sendEffect(TimerContract.Effect.LoadConfig)
+                state
+            }
+
+        is TimerContract.Executor.ConfigLoaded -> {
+            val config = ex.config ?: return@execute run {
+                // В Room тоже нет конфига — нечего запускать
+                sendEvent(TimerContract.Event.NavigateBack)
+                state.copy(isLoading = false)
+            }
+            val phases = buildTimerSequence(config)
+            val firstDuration = phases.first().durationOrZero
+            sendEffect(TimerContract.Effect.SaveState(
+                TimerSnapshot(
+                    reps = config.reps,
+                    repDuration = config.repDuration,
+                    restDuration = config.restDuration,
+                    phaseIndex = 0,
+                    remainingSeconds = firstDuration,
                     isRunning = true,
                 )
-            } ?: state
-
-        is TimerContract.Executor.Init -> {
-            val phases = buildTimerSequence(ex.config)
-            val firstDuration = phases.first().durationOrZero
-            sendEffect(
-                TimerContract.Effect.SaveState(
-                    TimerSnapshot(
-                        reps = ex.config.reps,
-                        repDuration = ex.config.repDuration,
-                        restDuration = ex.config.restDuration,
-                        phaseIndex = 0,
-                        remainingSeconds = firstDuration,
-                    )
-                )
-            )
-            sendEffect(TimerContract.Effect.StartTimer)
+            ))
+            startTimer()
             state.copy(
-                config = ex.config,
+                isLoading = false,
+                config = config,
                 phases = phases,
                 currentPhaseIndex = 0,
                 remainingSeconds = firstDuration,
@@ -140,11 +162,16 @@ class TimerViewModel @Inject constructor(
                 advanceToNextPhase()
             }
 
-        TimerContract.Executor.Stop ->
+        TimerContract.Executor.Stop -> {
+            state.toSnapshot(isRunning = false)
+                ?.let { sendEffect(TimerContract.Effect.SaveState(it)) }
             state.copy(isRunning = false)
+        }
 
         TimerContract.Executor.Resume -> {
-            sendEffect(TimerContract.Effect.StartTimer)
+            state.toSnapshot(isRunning = true)
+                ?.let { sendEffect(TimerContract.Effect.SaveState(it)) }
+            startTimer()
             state.copy(isRunning = true)
         }
 
@@ -164,14 +191,22 @@ class TimerViewModel @Inject constructor(
                 dispatch(TimerContract.Executor.StateLoaded(snapshot))
             }
 
+            TimerContract.Effect.LoadConfig -> {
+                val config = workoutConfigRepository.load()
+                dispatch(TimerContract.Executor.ConfigLoaded(config))
+            }
+
             is TimerContract.Effect.SaveState -> timerStateDataStore.save(ef.snapshot)
 
             TimerContract.Effect.ClearState -> timerStateDataStore.clear()
 
-            TimerContract.Effect.StartTimer -> {
-                while (state.isRunning) {
+            is TimerContract.Effect.StartTimer -> {
+                val gen = ef.generation
+                while (state.isRunning && timerGeneration == gen) {
                     delay(1_000L)
-                    if (state.isRunning) dispatch(TimerContract.Executor.Tick)
+                    if (state.isRunning && timerGeneration == gen) {
+                        dispatch(TimerContract.Executor.Tick)
+                    }
                 }
             }
         }
@@ -204,6 +239,7 @@ private val TimerPhase.durationOrZero: Int
 private fun TimerContract.State.toSnapshot(
     phaseIndex: Int = currentPhaseIndex,
     remainingSeconds: Int = this.remainingSeconds,
+    isRunning: Boolean = this.isRunning,
 ): TimerSnapshot? {
     val config = config ?: return null
     return TimerSnapshot(
@@ -212,5 +248,6 @@ private fun TimerContract.State.toSnapshot(
         restDuration = config.restDuration,
         phaseIndex = phaseIndex,
         remainingSeconds = remainingSeconds,
+        isRunning = isRunning,
     )
 }

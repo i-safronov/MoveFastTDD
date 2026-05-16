@@ -50,7 +50,7 @@ class SetupScreen : Screen {
         OnEvent(viewModel.events) { event ->
             when (event) {
                 is SetupContract.Event.NavigateToTimer ->
-                    navigator.push(TimerScreen(event.config))
+                    navigator.push(TimerScreen)
             }
         }
 

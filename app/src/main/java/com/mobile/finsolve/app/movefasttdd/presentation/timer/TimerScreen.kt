@@ -4,6 +4,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +49,7 @@ object TimerScreenTags {
     const val DONE_BUTTON = "timer_done_button"
 }
 
-data class TimerScreen(val config: WorkoutConfig) : Screen {
+object TimerScreen : Screen {
 
     @Composable
     override fun Content() {
@@ -59,17 +60,9 @@ data class TimerScreen(val config: WorkoutConfig) : Screen {
             viewModel.dispatch(TimerContract.Executor.Cancel)
         }
 
-        LaunchedEffect(Unit) {
-            if (viewModel.state.phases.isEmpty()) {
-                viewModel.dispatch(TimerContract.Executor.Init(config))
-            }
-        }
-
         OnEvent(viewModel.events) { event ->
             when (event) {
                 TimerContract.Event.NavigateBack -> navigator.pop()
-                // WorkoutFinished не навигирует автоматически —
-                // пользователь видит экран завершения и сам нажимает Done
                 TimerContract.Event.WorkoutFinished -> Unit
             }
         }
@@ -90,6 +83,16 @@ internal fun TimerContent(
     onResume: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    if (state.isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
     val isFinished = state.currentPhase is TimerPhase.Finished
 
     val phaseColor by animateColorAsState(
@@ -253,7 +256,12 @@ private fun TimerWorkPreview() {
         TimerContent(
             state = TimerContract.State(
                 config = WorkoutConfig(reps = 3, repDuration = 30, restDuration = 10),
-                phases = listOf(TimerPhase.Work(30), TimerPhase.Rest(10), TimerPhase.Work(30), TimerPhase.Finished),
+                phases = listOf(
+                    TimerPhase.Work(30),
+                    TimerPhase.Rest(10),
+                    TimerPhase.Work(30),
+                    TimerPhase.Finished
+                ),
                 currentPhaseIndex = 0,
                 remainingSeconds = 24,
                 isRunning = true,
@@ -270,7 +278,12 @@ private fun TimerRestPreview() {
         TimerContent(
             state = TimerContract.State(
                 config = WorkoutConfig(reps = 3, repDuration = 30, restDuration = 10),
-                phases = listOf(TimerPhase.Work(30), TimerPhase.Rest(10), TimerPhase.Work(30), TimerPhase.Finished),
+                phases = listOf(
+                    TimerPhase.Work(30),
+                    TimerPhase.Rest(10),
+                    TimerPhase.Work(30),
+                    TimerPhase.Finished
+                ),
                 currentPhaseIndex = 1,
                 remainingSeconds = 8,
                 isRunning = true,
@@ -287,7 +300,12 @@ private fun TimerPausedPreview() {
         TimerContent(
             state = TimerContract.State(
                 config = WorkoutConfig(reps = 3, repDuration = 30, restDuration = 10),
-                phases = listOf(TimerPhase.Work(30), TimerPhase.Rest(10), TimerPhase.Work(30), TimerPhase.Finished),
+                phases = listOf(
+                    TimerPhase.Work(30),
+                    TimerPhase.Rest(10),
+                    TimerPhase.Work(30),
+                    TimerPhase.Finished
+                ),
                 currentPhaseIndex = 0,
                 remainingSeconds = 15,
                 isRunning = false,

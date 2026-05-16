@@ -2,8 +2,10 @@ package com.mobile.finsolve.app.movefasttdd.presentation.timer
 
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -14,6 +16,7 @@ import com.mobile.finsolve.app.movefasttdd.domain.model.TimerPhase
 import com.mobile.finsolve.app.movefasttdd.domain.model.WorkoutConfig
 import com.mobile.finsolve.app.movefasttdd.presentation.timer.view_model.TimerContract
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -39,6 +42,7 @@ class TimerScreenTest {
         currentPhaseIndex: Int = 0,
         isRunning: Boolean = true,
     ) = TimerContract.State(
+        isLoading = false,
         config = WorkoutConfig(reps = 2, repDuration = 30, restDuration = 10),
         phases = defaultPhases,
         currentPhaseIndex = currentPhaseIndex,
@@ -47,6 +51,7 @@ class TimerScreenTest {
     )
 
     private fun restState(remainingSeconds: Int = 10) = TimerContract.State(
+        isLoading = false,
         config = WorkoutConfig(reps = 2, repDuration = 30, restDuration = 10),
         phases = defaultPhases,
         currentPhaseIndex = 1,
@@ -55,6 +60,7 @@ class TimerScreenTest {
     )
 
     private fun finishedState() = TimerContract.State(
+        isLoading = false,
         config = WorkoutConfig(reps = 2, repDuration = 30, restDuration = 10),
         phases = defaultPhases,
         currentPhaseIndex = 3,
@@ -143,7 +149,7 @@ class TimerScreenTest {
         setContent(state = restState())
         composeTestRule.onNodeWithText("REST").assertIsDisplayed()
     }
-
+ 
     @Test
     fun restPhase_showsCorrectRepCounter() {
         // index=1 (Rest) — пользователь выполнил 1 Work → Rep 1 of 2
@@ -384,6 +390,179 @@ class TimerScreenTest {
         setContent(state = workState(), onCancel = { cancelCount++ })
         Espresso.pressBack()
         assertEquals(1, cancelCount)
+    }
+
+    // endregion
+
+    // region Rapid Stop/Resume taps
+
+    @Test
+    fun rapidPause_callsOnStop_eachTime() {
+        var stopCount = 0
+        composeTestRule.setContent {
+            TimerContent(
+                state = workState(isRunning = true),
+                onStop = { stopCount++ },
+                onResume = {},
+                onCancel = {},
+            )
+        }
+        repeat(10) {
+            composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+        }
+        assertEquals(10, stopCount)
+    }
+
+    @Test
+    fun rapidResume_callsOnResume_eachTime() {
+        var resumeCount = 0
+        composeTestRule.setContent {
+            TimerContent(
+                state = workState(isRunning = false),
+                onStop = {},
+                onResume = { resumeCount++ },
+                onCancel = {},
+            )
+        }
+        repeat(10) {
+            composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+        }
+        assertEquals(10, resumeCount)
+    }
+
+    @Test
+    fun rapidAlternation_resumeButtonVisible_afterOddTaps() {
+        // Нечётное число тапов: начали с isRunning=true → в конце false → Resume видна
+        var isRunning by mutableStateOf(true)
+        composeTestRule.setContent {
+            TimerContent(
+                state = workState(isRunning = isRunning),
+                onStop = { isRunning = false },
+                onResume = { isRunning = true },
+                onCancel = {},
+            )
+        }
+        repeat(9) {
+            if (isRunning) composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+            else composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+        }
+        // 9 тапов (нечётное) → isRunning=false
+        assertFalse(isRunning)
+        composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
+    }
+
+    @Test
+    fun rapidAlternation_pauseButtonVisible_afterEvenTaps() {
+        // Чётное число тапов: начали с isRunning=true → в конце true → Pause видна
+        var isRunning by mutableStateOf(true)
+        composeTestRule.setContent {
+            TimerContent(
+                state = workState(isRunning = isRunning),
+                onStop = { isRunning = false },
+                onResume = { isRunning = true },
+                onCancel = {},
+            )
+        }
+        repeat(10) {
+            if (isRunning) composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+            else composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+        }
+        // 10 тапов (чётное) → isRunning=true
+        assertTrue(isRunning)
+        composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
+    }
+
+    @Test
+    fun rapidAlternation_correctButtonShownAfterEachTap() {
+        var isRunning by mutableStateOf(true)
+        composeTestRule.setContent {
+            TimerContent(
+                state = workState(isRunning = isRunning),
+                onStop = { isRunning = false },
+                onResume = { isRunning = true },
+                onCancel = {},
+            )
+        }
+        repeat(6) {
+            if (isRunning) {
+                composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed().performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
+            } else {
+                composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed().performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
+            }
+        }
+    }
+
+    @Test
+    fun rapidAlternation_neverShowsBothButtonsAtOnce() {
+        var isRunning by mutableStateOf(true)
+        composeTestRule.setContent {
+            TimerContent(
+                state = workState(isRunning = isRunning),
+                onStop = { isRunning = false },
+                onResume = { isRunning = true },
+                onCancel = {},
+            )
+        }
+        repeat(8) {
+            if (isRunning) composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+            else composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+
+            if (isRunning) {
+                composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertDoesNotExist()
+                composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertIsDisplayed()
+            } else {
+                composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).assertDoesNotExist()
+                composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).assertIsDisplayed()
+            }
+        }
+    }
+
+    @Test
+    fun cancelButton_alwaysVisible_duringRapidTaps() {
+        var isRunning by mutableStateOf(true)
+        composeTestRule.setContent {
+            TimerContent(
+                state = workState(isRunning = isRunning),
+                onStop = { isRunning = false },
+                onResume = { isRunning = true },
+                onCancel = {},
+            )
+        }
+        repeat(10) {
+            composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).assertIsDisplayed()
+            if (isRunning) composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+            else composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+        }
+    }
+
+    @Test
+    fun rapidPause_thenCancel_callsOnCancel() {
+        var cancelCalled = false
+        var isRunning by mutableStateOf(true)
+        composeTestRule.setContent {
+            TimerContent(
+                state = workState(isRunning = isRunning),
+                onStop = { isRunning = false },
+                onResume = { isRunning = true },
+                onCancel = { cancelCalled = true },
+            )
+        }
+        repeat(3) {
+            composeTestRule.onNodeWithTag(TimerScreenTags.PAUSE_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag(TimerScreenTags.RESUME_BUTTON).performClick()
+            composeTestRule.waitForIdle()
+        }
+        composeTestRule.onNodeWithTag(TimerScreenTags.CANCEL_BUTTON).performClick()
+        assertTrue(cancelCalled)
     }
 
     // endregion

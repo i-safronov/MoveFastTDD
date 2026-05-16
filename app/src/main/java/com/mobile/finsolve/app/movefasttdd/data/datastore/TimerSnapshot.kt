@@ -6,4 +6,5 @@ data class TimerSnapshot(
     val restDuration: Int,
     val phaseIndex: Int,
     val remainingSeconds: Int,
+    val isRunning: Boolean,
 )

@@ -3,6 +3,7 @@ package com.mobile.finsolve.app.movefasttdd.data.datastore
 import android.content.Context
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -43,6 +44,7 @@ private object TimerKeys {
     val REST_DURATION = intPreferencesKey("rest_duration")
     val PHASE_INDEX = intPreferencesKey("phase_index")
     val REMAINING_SECONDS = intPreferencesKey("remaining_seconds")
+    val IS_RUNNING = booleanPreferencesKey("is_running")
 }
 
 private fun Preferences.toSnapshot(): TimerSnapshot? {
@@ -51,7 +53,8 @@ private fun Preferences.toSnapshot(): TimerSnapshot? {
     val restDuration = this[TimerKeys.REST_DURATION] ?: return null
     val phaseIndex = this[TimerKeys.PHASE_INDEX] ?: return null
     val remainingSeconds = this[TimerKeys.REMAINING_SECONDS] ?: return null
-    return TimerSnapshot(reps, repDuration, restDuration, phaseIndex, remainingSeconds)
+    val isRunning = this[TimerKeys.IS_RUNNING] ?: true
+    return TimerSnapshot(reps, repDuration, restDuration, phaseIndex, remainingSeconds, isRunning)
 }
 
 private fun MutablePreferences.fromSnapshot(snapshot: TimerSnapshot) {
@@ -60,4 +63,5 @@ private fun MutablePreferences.fromSnapshot(snapshot: TimerSnapshot) {
     this[TimerKeys.REST_DURATION] = snapshot.restDuration
     this[TimerKeys.PHASE_INDEX] = snapshot.phaseIndex
     this[TimerKeys.REMAINING_SECONDS] = snapshot.remainingSeconds
+    this[TimerKeys.IS_RUNNING] = snapshot.isRunning
 }
