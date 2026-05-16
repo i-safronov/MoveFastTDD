@@ -38,21 +38,21 @@ class WorkoutDraftDataStoreImpl @Inject constructor(
 }
 
 // Ключи на уровне файла — доступны маперам, но скрыты снаружи
-private object Keys {
+private object DraftKeys {
     val REPS = intPreferencesKey("reps")
     val REP_DURATION = intPreferencesKey("rep_duration")
     val REST_DURATION = intPreferencesKey("rest_duration")
 }
 
 private fun Preferences.toDraft(): WorkoutDraft? {
-    val reps = this[Keys.REPS] ?: return null
-    val repDuration = this[Keys.REP_DURATION] ?: return null
-    val restDuration = this[Keys.REST_DURATION] ?: return null
+    val reps = this[DraftKeys.REPS] ?: return null
+    val repDuration = this[DraftKeys.REP_DURATION] ?: return null
+    val restDuration = this[DraftKeys.REST_DURATION] ?: return null
     return WorkoutDraft(reps, repDuration, restDuration)
 }
 
 private fun MutablePreferences.fromDraft(draft: WorkoutDraft) {
-    this[Keys.REPS] = draft.reps
-    this[Keys.REP_DURATION] = draft.repDuration
-    this[Keys.REST_DURATION] = draft.restDuration
+    this[DraftKeys.REPS] = draft.reps
+    this[DraftKeys.REP_DURATION] = draft.repDuration
+    this[DraftKeys.REST_DURATION] = draft.restDuration
 }
