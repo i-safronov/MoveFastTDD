@@ -1,11 +1,15 @@
 package com.mobile.finsolve.app.movefasttdd.presentation.setup
 
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -23,7 +27,7 @@ import org.junit.runner.RunWith
 class SetupScreenTest {
 
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeTestRule = createAndroidComposeRule<ComponentActivity>()
 
     private val hasError = SemanticsMatcher.keyIsDefined(SemanticsProperties.Error)
     private val hasNoError = SemanticsMatcher.keyNotDefined(SemanticsProperties.Error)
@@ -259,6 +263,146 @@ class SetupScreenTest {
 
         // Буквы фильтруются — пустая строка не конвертируется в Int, колбэк не вызван
         assertEquals(null, capturedValue)
+    }
+
+    // endregion
+
+    // region Configuration Change
+
+    @Test
+    fun rotation_allFieldsStillVisible() {
+        setContent()
+        composeTestRule.activityRule.scenario.recreate()
+        composeTestRule.waitForIdle()
+        setContent()
+
+        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(SetupScreenTags.REST_DURATION_FIELD).assertIsDisplayed()
+        composeTestRule.onNodeWithTag(SetupScreenTags.START_BUTTON).assertIsDisplayed()
+    }
+
+    @Test
+    fun rotation_preservesFieldValues() {
+        var reps by mutableStateOf(5)
+        fun content() {
+            composeTestRule.setContent {
+                SetupContent(
+                    state = SetupContract.State(reps = reps),
+                    onRepsChange = { reps = it },
+                    onRepDurationChange = {},
+                    onRestDurationChange = {},
+                    onStart = {},
+                )
+            }
+        }
+        content()
+        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).apply {
+            performTextClearance()
+            performTextInput("7")
+        }
+        assertEquals(7, reps)
+
+        composeTestRule.activityRule.scenario.recreate()
+        composeTestRule.waitForIdle()
+        content()
+
+        composeTestRule.onNodeWithText("7").assertIsDisplayed()
+    }
+
+    @Test
+    fun rotation_preservesErrorState() {
+        fun content(repsError: Boolean) {
+            composeTestRule.setContent {
+                SetupContent(
+                    state = SetupContract.State(repsError = repsError),
+                    onRepsChange = {},
+                    onRepDurationChange = {},
+                    onRestDurationChange = {},
+                    onStart = {},
+                )
+            }
+        }
+        content(repsError = true)
+        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
+
+        composeTestRule.activityRule.scenario.recreate()
+        composeTestRule.waitForIdle()
+        content(repsError = true)
+
+        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
+        composeTestRule.onNodeWithTag(SetupScreenTags.REP_DURATION_FIELD).assert(hasNoError)
+    }
+
+    @Test
+    fun rotation_noErrorStatePreservedWhenNoError() {
+        fun content() {
+            composeTestRule.setContent {
+                SetupContent(
+                    state = SetupContract.State(),
+                    onRepsChange = {},
+                    onRepDurationChange = {},
+                    onRestDurationChange = {},
+                    onStart = {},
+                )
+            }
+        }
+        content()
+        composeTestRule.onNodeWithTag(SetupScreenTags.ERROR_MESSAGE).assertIsNotDisplayed()
+
+        composeTestRule.activityRule.scenario.recreate()
+        composeTestRule.waitForIdle()
+        content()
+
+        composeTestRule.onNodeWithTag(SetupScreenTags.ERROR_MESSAGE).assertIsNotDisplayed()
+    }
+
+    @Test
+    fun rotation_startButtonStillClickable() {
+        var startCalled = false
+        fun content() {
+            composeTestRule.setContent {
+                SetupContent(
+                    state = SetupContract.State(),
+                    onRepsChange = {},
+                    onRepDurationChange = {},
+                    onRestDurationChange = {},
+                    onStart = { startCalled = true },
+                )
+            }
+        }
+        content()
+        composeTestRule.activityRule.scenario.recreate()
+        composeTestRule.waitForIdle()
+        content()
+
+        composeTestRule.onNodeWithTag(SetupScreenTags.START_BUTTON).performClick()
+        assertTrue(startCalled)
+    }
+
+    @Test
+    fun landscapeToPortrait_multipleRotations_uiStaysCorrect() {
+        fun content(repsError: Boolean = false) {
+            composeTestRule.setContent {
+                SetupContent(
+                    state = SetupContract.State(repsError = repsError),
+                    onRepsChange = {},
+                    onRepDurationChange = {},
+                    onRestDurationChange = {},
+                    onStart = {},
+                )
+            }
+        }
+        content(repsError = true)
+
+        repeat(3) {
+            composeTestRule.activityRule.scenario.recreate()
+            composeTestRule.waitForIdle()
+            content(repsError = true)
+        }
+
+        composeTestRule.onNodeWithTag(SetupScreenTags.REPS_FIELD).assert(hasError)
+        composeTestRule.onNodeWithTag(SetupScreenTags.START_BUTTON).assertIsDisplayed()
     }
 
     // endregion
