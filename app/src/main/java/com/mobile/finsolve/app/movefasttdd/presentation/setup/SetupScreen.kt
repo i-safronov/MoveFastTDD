@@ -30,6 +30,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.OnEvent
 import com.mobile.finsolve.app.movefasttdd.presentation.setup.view_model.SetupContract
 import com.mobile.finsolve.app.movefasttdd.presentation.setup.view_model.SetupViewModel
+import com.mobile.finsolve.app.movefasttdd.presentation.theme.MoveFastTDDTheme
 import com.mobile.finsolve.app.movefasttdd.presentation.timer.TimerScreen
 
 object SetupScreenTags {
@@ -192,7 +193,7 @@ private fun SetupErrorMessage() {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun SetupContentPreview() {
-    com.mobile.finsolve.app.movefasttdd.ui.theme.MoveFastTDDTheme {
+    MoveFastTDDTheme {
         SetupContent(
             state = SetupContract.State(),
             onRepsChange = {},
@@ -206,9 +207,14 @@ private fun SetupContentPreview() {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun SetupContentErrorPreview() {
-    com.mobile.finsolve.app.movefasttdd.ui.theme.MoveFastTDDTheme {
+    MoveFastTDDTheme {
         SetupContent(
-            state = SetupContract.State(reps = 0, repDuration = 0, repsError = true, repDurationError = true),
+            state = SetupContract.State(
+                reps = 0,
+                repDuration = 0,
+                repsError = true,
+                repDurationError = true
+            ),
             onRepsChange = {},
             onRepDurationChange = {},
             onRestDurationChange = {},

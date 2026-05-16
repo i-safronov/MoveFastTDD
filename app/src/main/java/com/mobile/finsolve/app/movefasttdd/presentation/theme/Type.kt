@@ -1,4 +1,4 @@
-package com.mobile.finsolve.app.movefasttdd.ui.theme
+package com.mobile.finsolve.app.movefasttdd.presentation.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

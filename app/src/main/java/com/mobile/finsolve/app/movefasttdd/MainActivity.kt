@@ -9,7 +9,7 @@ import cafe.adriel.voyager.navigator.Navigator
 import com.mobile.finsolve.app.movefasttdd.data.datastore.TimerStateDataStore
 import com.mobile.finsolve.app.movefasttdd.presentation.setup.SetupScreen
 import com.mobile.finsolve.app.movefasttdd.presentation.timer.TimerScreen
-import com.mobile.finsolve.app.movefasttdd.ui.theme.MoveFastTDDTheme
+import com.mobile.finsolve.app.movefasttdd.presentation.theme.MoveFastTDDTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject

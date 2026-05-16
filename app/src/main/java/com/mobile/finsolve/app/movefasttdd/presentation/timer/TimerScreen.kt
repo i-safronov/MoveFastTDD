@@ -35,6 +35,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.mobile.finsolve.app.movefasttdd.domain.model.TimerPhase
 import com.mobile.finsolve.app.movefasttdd.domain.model.WorkoutConfig
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.OnEvent
+import com.mobile.finsolve.app.movefasttdd.presentation.theme.MoveFastTDDTheme
 import com.mobile.finsolve.app.movefasttdd.presentation.timer.view_model.TimerContract
 import com.mobile.finsolve.app.movefasttdd.presentation.timer.view_model.TimerViewModel
 
@@ -252,7 +253,7 @@ internal fun Int.formatTime(): String {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun TimerWorkPreview() {
-    com.mobile.finsolve.app.movefasttdd.ui.theme.MoveFastTDDTheme {
+    MoveFastTDDTheme {
         TimerContent(
             state = TimerContract.State(
                 config = WorkoutConfig(reps = 3, repDuration = 30, restDuration = 10),
@@ -274,7 +275,7 @@ private fun TimerWorkPreview() {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun TimerRestPreview() {
-    com.mobile.finsolve.app.movefasttdd.ui.theme.MoveFastTDDTheme {
+    MoveFastTDDTheme {
         TimerContent(
             state = TimerContract.State(
                 config = WorkoutConfig(reps = 3, repDuration = 30, restDuration = 10),
@@ -296,7 +297,7 @@ private fun TimerRestPreview() {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun TimerPausedPreview() {
-    com.mobile.finsolve.app.movefasttdd.ui.theme.MoveFastTDDTheme {
+    MoveFastTDDTheme {
         TimerContent(
             state = TimerContract.State(
                 config = WorkoutConfig(reps = 3, repDuration = 30, restDuration = 10),
@@ -318,7 +319,7 @@ private fun TimerPausedPreview() {
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun TimerFinishedPreview() {
-    com.mobile.finsolve.app.movefasttdd.ui.theme.MoveFastTDDTheme {
+    MoveFastTDDTheme {
         TimerContent(
             state = TimerContract.State(
                 config = WorkoutConfig(reps = 2, repDuration = 30, restDuration = 10),
