@@ -48,6 +48,18 @@ class TimerViewModelTest {
         viewModel = buildViewModel()
     }
 
+    private fun firstNonSoundEvent(): TimerContract.Event? {
+        repeat(20) {
+            val event = viewModel.events.tryReceive().getOrNull() ?: return null
+            if (event !is TimerContract.Event.PlaySound) return event
+        }
+        return null
+    }
+
+    private fun drainSoundEvents() {
+        while (viewModel.events.tryReceive().getOrNull() is TimerContract.Event.PlaySound) { /* drain */ }
+    }
+
     @After
     fun teardown() {
         Dispatchers.resetMain()
@@ -164,7 +176,7 @@ class TimerViewModelTest {
     @Test
     fun `WorkoutFinished event sent when Finished phase reached`() = runTest {
         repeat(3 + 2 + 3) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertTrue(viewModel.events.tryReceive().getOrNull() is TimerContract.Event.WorkoutFinished)
+        Assert.assertTrue(firstNonSoundEvent() is TimerContract.Event.WorkoutFinished)
     }
 
     @Test
@@ -193,6 +205,7 @@ class TimerViewModelTest {
     @Test
     fun `Stop does not send NavigateBack event`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Stop)
+        drainSoundEvents()
         Assert.assertFalse(viewModel.events.tryReceive().isSuccess)
     }
 
@@ -260,7 +273,7 @@ class TimerViewModelTest {
     @Test
     fun `Cancel sends NavigateBack event`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Cancel)
-        Assert.assertTrue(viewModel.events.tryReceive().getOrNull() is TimerContract.Event.NavigateBack)
+        Assert.assertTrue(firstNonSoundEvent() is TimerContract.Event.NavigateBack)
     }
 
     @Test
@@ -354,7 +367,7 @@ class TimerViewModelTest {
         viewModel = buildViewModel()
         viewModel.dispatch(TimerContract.Executor.Tick)
         Assert.assertTrue(viewModel.state.currentPhase is TimerPhase.Finished)
-        Assert.assertTrue(viewModel.events.tryReceive().getOrNull() is TimerContract.Event.WorkoutFinished)
+        Assert.assertTrue(firstNonSoundEvent() is TimerContract.Event.WorkoutFinished)
     }
 
     @Test
@@ -464,14 +477,14 @@ class TimerViewModelTest {
     @Test
     fun `rapid Stops do not send multiple NavigateBack events`() = runTest {
         repeat(10) { viewModel.dispatch(TimerContract.Executor.Stop) }
+        drainSoundEvents()
         Assert.assertFalse(viewModel.events.tryReceive().isSuccess)
     }
 
     @Test
     fun `rapid Cancels send NavigateBack only once`() = runTest {
         repeat(5) { viewModel.dispatch(TimerContract.Executor.Cancel) }
-        val first = viewModel.events.tryReceive()
-        Assert.assertTrue(first.getOrNull() is TimerContract.Event.NavigateBack)
+        Assert.assertTrue(firstNonSoundEvent() is TimerContract.Event.NavigateBack)
     }
 
     @Test

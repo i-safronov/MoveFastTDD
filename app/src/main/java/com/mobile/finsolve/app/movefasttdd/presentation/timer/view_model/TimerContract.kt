@@ -46,9 +46,12 @@ object TimerContract {
         data object Cancel : Executor
     }
 
+    enum class SoundType { START, END }
+
     sealed interface Event : Apex.Event {
         data object NavigateBack : Event
         data object WorkoutFinished : Event
+        data class PlaySound(val type: SoundType) : Event
     }
 
     sealed interface Effect : Apex.Effect {

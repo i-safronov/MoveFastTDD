@@ -1,6 +1,9 @@
 package com.mobile.finsolve.app.movefasttdd.presentation.timer
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -61,8 +64,15 @@ object TimerScreen : Screen {
             viewModel.dispatch(TimerContract.Executor.Cancel)
         }
 
+        val context = LocalContext.current
+        val soundPlayer = remember { TimerSoundPlayer(context) }
+        DisposableEffect(Unit) {
+            onDispose { soundPlayer.release() }
+        }
+
         OnEvent(viewModel.events) { event ->
             when (event) {
+                is TimerContract.Event.PlaySound -> soundPlayer.play(event.type)
                 TimerContract.Event.NavigateBack -> navigator.pop()
                 TimerContract.Event.WorkoutFinished -> Unit
             }

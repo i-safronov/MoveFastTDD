@@ -52,7 +52,10 @@ class TimerViewModel @Inject constructor(
             ex.snapshot?.let { snapshot ->
                 val config = WorkoutConfig(snapshot.reps, snapshot.repDuration, snapshot.restDuration)
                 val phases = buildTimerSequence(config)
-                if (snapshot.isRunning) startTimer()
+                if (snapshot.isRunning) {
+                    sendEvent(TimerContract.Event.PlaySound(TimerContract.SoundType.START))
+                    startTimer()
+                }
                 state.copy(
                     isLoading = false,
                     config = config,
@@ -62,7 +65,6 @@ class TimerViewModel @Inject constructor(
                     isRunning = snapshot.isRunning,
                 )
             } ?: run {
-                // Нет активной тренировки — грузим последний конфиг из Room
                 sendEffect(TimerContract.Effect.LoadConfig)
                 state
             }
@@ -85,6 +87,7 @@ class TimerViewModel @Inject constructor(
                     isRunning = true,
                 )
             ))
+            sendEvent(TimerContract.Event.PlaySound(TimerContract.SoundType.START))
             startTimer()
             state.copy(
                 isLoading = false,
@@ -164,15 +167,27 @@ class TimerViewModel @Inject constructor(
         val nextIndex = state.currentPhaseIndex + 1
         val nextPhase = state.phases[nextIndex]
 
-        return if (nextPhase is TimerPhase.Finished) {
-            sendEffect(TimerContract.Effect.ClearState)
-            sendEvent(TimerContract.Event.WorkoutFinished)
-            state.copy(currentPhaseIndex = nextIndex, remainingSeconds = 0, isRunning = false)
-        } else {
-            val nextDuration = nextPhase.durationOrZero
-            state.toSnapshot(phaseIndex = nextIndex, remainingSeconds = nextDuration)
-                ?.let { sendEffect(TimerContract.Effect.SaveState(it)) }
-            state.copy(currentPhaseIndex = nextIndex, remainingSeconds = nextDuration)
+        return when (nextPhase) {
+            is TimerPhase.Finished -> {
+                sendEffect(TimerContract.Effect.ClearState)
+                sendEvent(TimerContract.Event.PlaySound(TimerContract.SoundType.END))
+                sendEvent(TimerContract.Event.WorkoutFinished)
+                state.copy(currentPhaseIndex = nextIndex, remainingSeconds = 0, isRunning = false)
+            }
+            is TimerPhase.Rest -> {
+                val nextDuration = nextPhase.durationOrZero
+                state.toSnapshot(phaseIndex = nextIndex, remainingSeconds = nextDuration)
+                    ?.let { sendEffect(TimerContract.Effect.SaveState(it)) }
+                sendEvent(TimerContract.Event.PlaySound(TimerContract.SoundType.END))
+                state.copy(currentPhaseIndex = nextIndex, remainingSeconds = nextDuration)
+            }
+            is TimerPhase.Work -> {
+                val nextDuration = nextPhase.durationOrZero
+                state.toSnapshot(phaseIndex = nextIndex, remainingSeconds = nextDuration)
+                    ?.let { sendEffect(TimerContract.Effect.SaveState(it)) }
+                sendEvent(TimerContract.Event.PlaySound(TimerContract.SoundType.START))
+                state.copy(currentPhaseIndex = nextIndex, remainingSeconds = nextDuration)
+            }
         }
     }
 }
