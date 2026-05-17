@@ -1,3 +1,15 @@
 <resources>
     <string name="app_name">MoveFastTDD</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_name">Таймер тренировки</string>
+    <string name="notification_channel_description">Отображает текущую фазу и обратный отсчёт</string>
+    <string name="notification_phase_work">Работа</string>
+    <string name="notification_phase_rest">Отдых</string>
+    <string name="notification_phase_finished">Готово!</string>
+    <string name="notification_rep_counter">Подход %1$d из %2$d</string>
+    <string name="notification_workout_done">Тренировка завершена</string>
+    <string name="notification_action_pause">Пауза</string>
+    <string name="notification_action_resume">Продолжить</string>
+    <string name="notification_action_cancel">Отмена</string>
 </resources>
