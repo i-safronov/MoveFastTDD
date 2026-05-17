@@ -1,12 +1,12 @@
 package com.mobile.finsolve.app.movefasttdd.presentation.timer.view_model
 
 import com.mobile.finsolve.app.movefasttdd.core.dispatchers.DispatchersList
-import com.mobile.finsolve.app.movefasttdd.data.datastore.FakeTimerStateDataStore
-import com.mobile.finsolve.app.movefasttdd.data.datastore.TimerSnapshot
 import com.mobile.finsolve.app.movefasttdd.domain.model.TimerPhase
+import com.mobile.finsolve.app.movefasttdd.domain.model.TimerState
 import com.mobile.finsolve.app.movefasttdd.domain.model.WorkoutConfig
-import com.mobile.finsolve.app.movefasttdd.domain.use_case.BuildTimerSequenceUseCase
+import com.mobile.finsolve.app.movefasttdd.domain.repository.FakeWorkoutTimerRepository
 import com.mobile.finsolve.app.movefasttdd.domain.usecase.FakeWorkoutConfigRepository
+import com.mobile.finsolve.app.movefasttdd.service.WorkoutServiceStarter
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -15,7 +15,9 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
-import org.junit.Assert
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -23,16 +25,37 @@ import org.junit.Test
 class TimerViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
-    private lateinit var dataStore: FakeTimerStateDataStore
-    private lateinit var repository: FakeWorkoutConfigRepository
+    private lateinit var timerRepo: FakeWorkoutTimerRepository
+    private lateinit var configRepo: FakeWorkoutConfigRepository
+    private lateinit var serviceStarter: FakeWorkoutServiceStarter
     private lateinit var viewModel: TimerViewModel
 
+    // config: [Work(3), Rest(2), Work(3), Finished]
     private val config = WorkoutConfig(reps = 2, repDuration = 3, restDuration = 2)
 
+    private val phases = listOf(
+        TimerPhase.Work(3),
+        TimerPhase.Rest(2),
+        TimerPhase.Work(3),
+        TimerPhase.Finished,
+    )
+
+    private fun timerState(
+        phaseIndex: Int = 0,
+        remainingSeconds: Int = 3,
+        isRunning: Boolean = true,
+    ) = TimerState(
+        config = config,
+        phases = phases,
+        currentPhaseIndex = phaseIndex,
+        remainingSeconds = remainingSeconds,
+        isRunning = isRunning,
+    )
+
     private fun buildViewModel() = TimerViewModel(
-        buildTimerSequence = BuildTimerSequenceUseCase(),
-        timerStateDataStore = dataStore,
-        workoutConfigRepository = repository,
+        workoutConfigRepository = configRepo,
+        workoutTimerRepository = timerRepo,
+        serviceStarter = serviceStarter,
         dispatchers = object : DispatchersList {
             override fun io(): CoroutineDispatcher = testDispatcher
             override fun ui(): CoroutineDispatcher = testDispatcher
@@ -42,10 +65,21 @@ class TimerViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        dataStore = FakeTimerStateDataStore()
-        repository = FakeWorkoutConfigRepository()
-        repository.configToReturn = config
+        timerRepo = FakeWorkoutTimerRepository()
+        configRepo = FakeWorkoutConfigRepository()
+        serviceStarter = FakeWorkoutServiceStarter()
+        configRepo.configToReturn = config
+        timerRepo.startEmitsState = timerState()
         viewModel = buildViewModel()
+    }
+
+    @After
+    fun teardown() {
+        Dispatchers.resetMain()
+    }
+
+    private fun drainSoundEvents() {
+        while (viewModel.events.tryReceive().getOrNull() is TimerContract.Event.PlaySound) { /* drain */ }
     }
 
     private fun firstNonSoundEvent(): TimerContract.Event? {
@@ -56,470 +90,288 @@ class TimerViewModelTest {
         return null
     }
 
-    private fun drainSoundEvents() {
-        while (viewModel.events.tryReceive().getOrNull() is TimerContract.Event.PlaySound) { /* drain */ }
-    }
-
-    @After
-    fun teardown() {
-        Dispatchers.resetMain()
-    }
-
-    // region Init from Repository (fresh start)
+    // region fresh start
 
     @Test
-    fun `fresh start builds phases from repository config`() = runTest {
-        Assert.assertEquals(4, viewModel.state.phases.size)
+    fun `fresh start sets isLoading to false`() = runTest {
+        assertFalse(viewModel.state.isLoading)
     }
 
     @Test
-    fun `fresh start sets first phase as Work`() = runTest {
-        Assert.assertTrue(viewModel.state.currentPhase is TimerPhase.Work)
+    fun `fresh start sets Work as first phase`() = runTest {
+        assertTrue(viewModel.state.currentPhase is TimerPhase.Work)
     }
 
     @Test
-    fun `fresh start sets remainingSeconds to first phase duration`() = runTest {
-        Assert.assertEquals(3, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `fresh start sets currentPhaseIndex to 0`() = runTest {
-        Assert.assertEquals(0, viewModel.state.currentPhaseIndex)
+    fun `fresh start sets remainingSeconds to repDuration`() = runTest {
+        assertEquals(3, viewModel.state.remainingSeconds)
     }
 
     @Test
     fun `fresh start sets isRunning to true`() = runTest {
-        Assert.assertTrue(viewModel.state.isRunning)
+        assertTrue(viewModel.state.isRunning)
     }
 
     @Test
-    fun `fresh start saves snapshot to DataStore`() = runTest {
-        Assert.assertNotNull(dataStore.snapshot)
-        Assert.assertEquals(2, dataStore.snapshot?.reps)
-        Assert.assertEquals(0, dataStore.snapshot?.phaseIndex)
-        Assert.assertEquals(3, dataStore.snapshot?.remainingSeconds)
-        Assert.assertEquals(true, dataStore.snapshot?.isRunning)
+    fun `fresh start sets correct phase count`() = runTest {
+        assertEquals(4, viewModel.state.phases.size)
     }
 
     @Test
-    fun `navigates back when repository load fails`() = runTest {
-        dataStore.snapshot = null
-        repository.shouldFailOnLoad = true
+    fun `fresh start calls repository start`() = runTest {
+        assertEquals(1, timerRepo.startCallCount)
+    }
+
+    @Test
+    fun `fresh start calls serviceStarter`() = runTest {
+        assertEquals(1, serviceStarter.startCallCount)
+    }
+
+    @Test
+    fun `fresh start plays START sound`() = runTest {
+        val event = viewModel.events.tryReceive().getOrNull()
+        assertEquals(TimerContract.Event.PlaySound(TimerContract.SoundType.START), event)
+    }
+
+    @Test
+    fun `navigates back when repository returns no config`() = runTest {
+        configRepo.configToReturn = null
+        timerRepo.startEmitsState = null
         viewModel = buildViewModel()
-        val event = viewModel.events.tryReceive()
-        Assert.assertTrue(event.getOrNull() is TimerContract.Event.NavigateBack)
+        assertTrue(firstNonSoundEvent() is TimerContract.Event.NavigateBack)
     }
 
     @Test
-    fun `navigates back when no config in repository`() = runTest {
-        // @Before уже сохранил snapshot в DataStore — сбрасываем, чтобы ViewModel шёл в repository
-        dataStore.snapshot = null
-        repository.configToReturn = null
+    fun `navigates back when config load fails`() = runTest {
+        configRepo.shouldFailOnLoad = true
+        timerRepo.startEmitsState = null
         viewModel = buildViewModel()
-        val event = viewModel.events.tryReceive()
-        Assert.assertTrue(event.getOrNull() is TimerContract.Event.NavigateBack)
+        assertTrue(firstNonSoundEvent() is TimerContract.Event.NavigateBack)
+    }
+
+    @Test
+    fun `does not navigate back on fresh start`() = runTest {
+        assertFalse(firstNonSoundEvent() is TimerContract.Event.NavigateBack)
     }
 
     // endregion
 
-    // region Tick — countdown
+    // region restore
 
-    @Test
-    fun `Tick decrements remainingSeconds by 1`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(2, viewModel.state.remainingSeconds)
+    private fun setupRestore(
+        phaseIndex: Int = 1,
+        remainingSeconds: Int = 2,
+        isRunning: Boolean = true,
+    ) {
+        timerRepo = FakeWorkoutTimerRepository()
+        serviceStarter = FakeWorkoutServiceStarter()
+        timerRepo.tryRestoreResult = true
+        timerRepo.restoreEmitsState = timerState(phaseIndex, remainingSeconds, isRunning)
+        viewModel = buildViewModel()
     }
 
     @Test
-    fun `multiple Ticks decrement remainingSeconds correctly`() = runTest {
-        repeat(2) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertEquals(1, viewModel.state.remainingSeconds)
+    fun `restore does not call repository start`() = runTest {
+        setupRestore()
+        assertEquals(0, timerRepo.startCallCount)
     }
 
     @Test
-    fun `Tick saves updated snapshot to DataStore`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(2, dataStore.snapshot?.remainingSeconds)
-        Assert.assertEquals(0, dataStore.snapshot?.phaseIndex)
-    }
-
-    // endregion
-
-    // region Tick — phase transitions
-    // [Work(3), Rest(2), Work(3), Finished]
-
-    @Test
-    fun `Tick at last second of Work advances to Rest`() = runTest {
-        repeat(3) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertTrue(viewModel.state.currentPhase is TimerPhase.Rest)
+    fun `restore calls serviceStarter`() = runTest {
+        setupRestore()
+        assertEquals(1, serviceStarter.startCallCount)
     }
 
     @Test
-    fun `Rest phase starts with full rest duration`() = runTest {
-        repeat(3) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertEquals(2, viewModel.state.remainingSeconds)
+    fun `restore sets correct phaseIndex`() = runTest {
+        setupRestore(phaseIndex = 1, remainingSeconds = 2)
+        assertEquals(1, viewModel.state.currentPhaseIndex)
     }
 
     @Test
-    fun `phase transition saves new phase to DataStore`() = runTest {
-        repeat(3) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertEquals(1, dataStore.snapshot?.phaseIndex)
-        Assert.assertEquals(2, dataStore.snapshot?.remainingSeconds)
+    fun `restore sets correct remainingSeconds`() = runTest {
+        setupRestore(phaseIndex = 1, remainingSeconds = 2)
+        assertEquals(2, viewModel.state.remainingSeconds)
     }
 
     @Test
-    fun `completing all phases reaches Finished`() = runTest {
-        repeat(3 + 2 + 3) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertTrue(viewModel.state.currentPhase is TimerPhase.Finished)
+    fun `restore plays START sound when isRunning=true`() = runTest {
+        setupRestore(phaseIndex = 0, remainingSeconds = 3, isRunning = true)
+        val event = viewModel.events.tryReceive().getOrNull()
+        assertEquals(TimerContract.Event.PlaySound(TimerContract.SoundType.START), event)
     }
 
     @Test
-    fun `WorkoutFinished event sent when Finished phase reached`() = runTest {
-        repeat(3 + 2 + 3) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertTrue(firstNonSoundEvent() is TimerContract.Event.WorkoutFinished)
-    }
-
-    @Test
-    fun `DataStore is cleared when workout finishes`() = runTest {
-        repeat(3 + 2 + 3) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertEquals(1, dataStore.clearCallCount)
-        Assert.assertNull(dataStore.snapshot)
-    }
-
-    @Test
-    fun `isRunning is false when Finished`() = runTest {
-        repeat(3 + 2 + 3) { viewModel.dispatch(TimerContract.Executor.Tick) }
-        Assert.assertFalse(viewModel.state.isRunning)
+    fun `restore does not play sound when isRunning=false`() = runTest {
+        setupRestore(phaseIndex = 0, remainingSeconds = 3, isRunning = false)
+        assertFalse(viewModel.events.tryReceive().isSuccess)
     }
 
     // endregion
 
-    // region Stop (пауза)
+    // region state mapping from repository
 
     @Test
-    fun `Stop sets isRunning to false`() = runTest {
+    fun `state update reflects new remainingSeconds`() = runTest {
+        timerRepo.emit(timerState(remainingSeconds = 2))
+        assertEquals(2, viewModel.state.remainingSeconds)
+    }
+
+    @Test
+    fun `state update reflects new phaseIndex`() = runTest {
+        timerRepo.emit(timerState(phaseIndex = 1, remainingSeconds = 2))
+        assertEquals(1, viewModel.state.currentPhaseIndex)
+    }
+
+    @Test
+    fun `state update reflects isRunning=false`() = runTest {
+        timerRepo.emit(timerState(isRunning = false))
+        assertFalse(viewModel.state.isRunning)
+    }
+
+    @Test
+    fun `state update reflects Rest phase`() = runTest {
+        timerRepo.emit(timerState(phaseIndex = 1, remainingSeconds = 2))
+        assertTrue(viewModel.state.currentPhase is TimerPhase.Rest)
+    }
+
+    // endregion
+
+    // region phase transition sounds
+
+    @Test
+    fun `Work to Rest plays END sound`() = runTest {
+        drainSoundEvents()
+        timerRepo.emit(timerState(phaseIndex = 1, remainingSeconds = 2)) // Rest phase
+        val event = viewModel.events.tryReceive().getOrNull()
+        assertEquals(TimerContract.Event.PlaySound(TimerContract.SoundType.END), event)
+    }
+
+    @Test
+    fun `Rest to Work plays START sound`() = runTest {
+        timerRepo.emit(timerState(phaseIndex = 1, remainingSeconds = 2)) // Rest
+        drainSoundEvents()
+        timerRepo.emit(timerState(phaseIndex = 2, remainingSeconds = 3)) // Work
+        val event = viewModel.events.tryReceive().getOrNull()
+        assertEquals(TimerContract.Event.PlaySound(TimerContract.SoundType.START), event)
+    }
+
+    @Test
+    fun `Finished phase plays END sound`() = runTest {
+        drainSoundEvents()
+        timerRepo.emit(timerState(phaseIndex = 3, remainingSeconds = 0, isRunning = false))
+        val event = viewModel.events.tryReceive().getOrNull()
+        assertEquals(TimerContract.Event.PlaySound(TimerContract.SoundType.END), event)
+    }
+
+    @Test
+    fun `Finished phase sends WorkoutFinished event`() = runTest {
+        drainSoundEvents()
+        timerRepo.emit(timerState(phaseIndex = 3, remainingSeconds = 0, isRunning = false))
+        assertTrue(firstNonSoundEvent() is TimerContract.Event.WorkoutFinished)
+    }
+
+    @Test
+    fun `WorkoutFinished sent only once for repeated Finished emissions`() = runTest {
+        val finishedState = timerState(phaseIndex = 3, remainingSeconds = 0, isRunning = false)
+        timerRepo.emit(finishedState)
+        timerRepo.emit(finishedState)
+        var workoutFinishedCount = 0
+        repeat(10) {
+            val event = viewModel.events.tryReceive().getOrNull() ?: return@repeat
+            if (event is TimerContract.Event.WorkoutFinished) workoutFinishedCount++
+        }
+        assertEquals(1, workoutFinishedCount)
+    }
+
+    // endregion
+
+    // region Stop / Resume / Cancel
+
+    @Test
+    fun `Stop calls repository pause`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Stop)
-        Assert.assertFalse(viewModel.state.isRunning)
+        assertEquals(1, timerRepo.pauseCallCount)
     }
 
     @Test
     fun `Stop does not send NavigateBack event`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Stop)
         drainSoundEvents()
-        Assert.assertFalse(viewModel.events.tryReceive().isSuccess)
+        assertFalse(viewModel.events.tryReceive().isSuccess)
     }
 
     @Test
-    fun `Stop does not clear DataStore`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        Assert.assertEquals(0, dataStore.clearCallCount)
-        Assert.assertNotNull(dataStore.snapshot)
-    }
-
-    @Test
-    fun `Tick after Stop does not change remainingSeconds`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        val secondsBefore = viewModel.state.remainingSeconds
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(secondsBefore, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `Tick after Stop does not change phase`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        val phaseBefore = viewModel.state.currentPhaseIndex
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(phaseBefore, viewModel.state.currentPhaseIndex)
-    }
-
-    // endregion
-
-    // region Resume
-
-    @Test
-    fun `Resume sets isRunning to true`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Stop)
+    fun `Resume calls repository resume`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Resume)
-        Assert.assertTrue(viewModel.state.isRunning)
+        assertEquals(1, timerRepo.resumeCallCount)
     }
 
     @Test
-    fun `Tick works after Resume`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        viewModel.dispatch(TimerContract.Executor.Resume)
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(2, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `Resume does not change remainingSeconds`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        val secondsBefore = viewModel.state.remainingSeconds
-        viewModel.dispatch(TimerContract.Executor.Resume)
-        Assert.assertEquals(secondsBefore, viewModel.state.remainingSeconds)
-    }
-
-    // endregion
-
-    // region Cancel
-
-    @Test
-    fun `Cancel sets isRunning to false`() = runTest {
+    fun `Cancel calls repository cancel`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Cancel)
-        Assert.assertFalse(viewModel.state.isRunning)
+        assertEquals(1, timerRepo.cancelCallCount)
     }
 
     @Test
     fun `Cancel sends NavigateBack event`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Cancel)
-        Assert.assertTrue(firstNonSoundEvent() is TimerContract.Event.NavigateBack)
+        assertTrue(firstNonSoundEvent() is TimerContract.Event.NavigateBack)
     }
 
     @Test
-    fun `Cancel clears DataStore`() = runTest {
+    fun `Cancel sets isRunning to false immediately`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Cancel)
-        Assert.assertEquals(1, dataStore.clearCallCount)
-        Assert.assertNull(dataStore.snapshot)
+        assertFalse(viewModel.state.isRunning)
     }
 
     @Test
-    fun `Cancel after Stop also clears DataStore`() = runTest {
+    fun `Stop then Resume calls pause then resume`() = runTest {
         viewModel.dispatch(TimerContract.Executor.Stop)
-        viewModel.dispatch(TimerContract.Executor.Cancel)
-        Assert.assertEquals(1, dataStore.clearCallCount)
-        Assert.assertNull(dataStore.snapshot)
-    }
-
-    // endregion
-
-    // region Process death restoration
-
-    private fun snapshotAt(
-        phaseIndex: Int,
-        remainingSeconds: Int,
-        isRunning: Boolean = true,
-    ) = TimerSnapshot(
-        reps = 2, repDuration = 3, restDuration = 2,
-        phaseIndex = phaseIndex,
-        remainingSeconds = remainingSeconds,
-        isRunning = isRunning,
-    )
-
-    @Test
-    fun `restores currentPhaseIndex from DataStore`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 1, remainingSeconds = 2)
-        viewModel = buildViewModel()
-        Assert.assertEquals(1, viewModel.state.currentPhaseIndex)
-    }
-
-    @Test
-    fun `restores remainingSeconds from DataStore`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 1, remainingSeconds = 2)
-        viewModel = buildViewModel()
-        Assert.assertEquals(2, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `restored timer has correct current phase`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 1, remainingSeconds = 2)
-        viewModel = buildViewModel()
-        Assert.assertTrue(viewModel.state.currentPhase is TimerPhase.Rest)
-    }
-
-    @Test
-    fun `restored timer is running when snapshot isRunning=true`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 0, remainingSeconds = 3, isRunning = true)
-        viewModel = buildViewModel()
-        Assert.assertTrue(viewModel.state.isRunning)
-    }
-
-    @Test
-    fun `restored timer does not load from repository when snapshot exists`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 0, remainingSeconds = 3)
-        // @Before already called load() once — reset before building to count only new calls
-        repository.loadCallCount = 0
-        viewModel = buildViewModel()
-        Assert.assertEquals(0, repository.loadCallCount)
-    }
-
-    @Test
-    fun `Tick works correctly after restoration`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 1, remainingSeconds = 2)
-        viewModel = buildViewModel()
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(1, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `Tick after restoration advances phase when remainingSeconds reaches zero`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 1, remainingSeconds = 1)
-        viewModel = buildViewModel()
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(2, viewModel.state.currentPhaseIndex)
-        Assert.assertTrue(viewModel.state.currentPhase is TimerPhase.Work)
-        Assert.assertEquals(3, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `restored timer completes workout correctly`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 2, remainingSeconds = 1)
-        viewModel = buildViewModel()
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertTrue(viewModel.state.currentPhase is TimerPhase.Finished)
-        Assert.assertTrue(firstNonSoundEvent() is TimerContract.Event.WorkoutFinished)
-    }
-
-    @Test
-    fun `Cancel after restoration clears DataStore`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 1, remainingSeconds = 2)
-        viewModel = buildViewModel()
-        viewModel.dispatch(TimerContract.Executor.Cancel)
-        Assert.assertEquals(1, dataStore.clearCallCount)
-        Assert.assertNull(dataStore.snapshot)
-    }
-
-    // endregion
-
-    // region Pause/Resume state persistence
-
-    @Test
-    fun `Stop saves isRunning=false to DataStore`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        Assert.assertEquals(false, dataStore.snapshot?.isRunning)
-    }
-
-    @Test
-    fun `Stop preserves phaseIndex and remainingSeconds in DataStore`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Tick) // remaining = 2
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        Assert.assertEquals(0, dataStore.snapshot?.phaseIndex)
-        Assert.assertEquals(2, dataStore.snapshot?.remainingSeconds)
-        Assert.assertEquals(false, dataStore.snapshot?.isRunning)
-    }
-
-    @Test
-    fun `restored timer is paused when snapshot has isRunning=false`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 0, remainingSeconds = 3, isRunning = false)
-        viewModel = buildViewModel()
-        Assert.assertFalse(viewModel.state.isRunning)
-    }
-
-    @Test
-    fun `Tick does not work when restored in paused state`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 0, remainingSeconds = 3, isRunning = false)
-        viewModel = buildViewModel()
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(3, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `Resume after restored pause starts timer correctly`() = runTest {
-        dataStore.snapshot = snapshotAt(phaseIndex = 0, remainingSeconds = 3, isRunning = false)
-        viewModel = buildViewModel()
         viewModel.dispatch(TimerContract.Executor.Resume)
-        Assert.assertTrue(viewModel.state.isRunning)
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(2, viewModel.state.remainingSeconds)
+        assertEquals(1, timerRepo.pauseCallCount)
+        assertEquals(1, timerRepo.resumeCallCount)
     }
 
     // endregion
 
-    // region Rapid Stop/Resume taps
+    // region computed state properties
 
     @Test
-    fun `rapid Stops result in isRunning=false`() = runTest {
-        repeat(10) { viewModel.dispatch(TimerContract.Executor.Stop) }
-        Assert.assertFalse(viewModel.state.isRunning)
+    fun `currentRep is 1 on first Work phase`() = runTest {
+        assertEquals(1, viewModel.state.currentRep)
     }
 
     @Test
-    fun `rapid Resumes result in isRunning=true`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        repeat(10) { viewModel.dispatch(TimerContract.Executor.Resume) }
-        Assert.assertTrue(viewModel.state.isRunning)
+    fun `totalReps matches config`() = runTest {
+        assertEquals(2, viewModel.state.totalReps)
     }
 
     @Test
-    fun `rapid alternation ends in state matching last action — Resume`() = runTest {
-        // 10 итераций: 0=Stop,1=Resume,...,9=Resume → последний Resume
-        repeat(10) { i ->
-            if (i % 2 == 0) viewModel.dispatch(TimerContract.Executor.Stop)
-            else viewModel.dispatch(TimerContract.Executor.Resume)
-        }
-        Assert.assertTrue(viewModel.state.isRunning)
+    fun `progress is 0 at start of phase`() = runTest {
+        assertEquals(0f, viewModel.state.progress, 0.01f)
     }
 
     @Test
-    fun `rapid alternation ends in state matching last action — Stop`() = runTest {
-        // 9 итераций: 0=Stop,...,8=Stop → последний Stop
-        repeat(9) { i ->
-            if (i % 2 == 0) viewModel.dispatch(TimerContract.Executor.Stop)
-            else viewModel.dispatch(TimerContract.Executor.Resume)
-        }
-        Assert.assertFalse(viewModel.state.isRunning)
+    fun `phaseDuration matches repDuration on Work phase`() = runTest {
+        assertEquals(3, viewModel.state.phaseDuration)
     }
 
     @Test
-    fun `Tick decrements by exactly 1 after rapid Stop-Resume alternation`() = runTest {
-        val initialRemaining = viewModel.state.remainingSeconds
-        repeat(10) { i ->
-            if (i % 2 == 0) viewModel.dispatch(TimerContract.Executor.Stop)
-            else viewModel.dispatch(TimerContract.Executor.Resume)
-        }
-
-        Assert.assertEquals(initialRemaining, viewModel.state.remainingSeconds)
-
-        viewModel.dispatch(TimerContract.Executor.Tick)
-        Assert.assertEquals(initialRemaining - 1, viewModel.state.remainingSeconds)
+    fun `isFinished is false during active workout`() = runTest {
+        assertFalse(viewModel.state.isFinished)
     }
 
     @Test
-    fun `rapid Stops do not send multiple NavigateBack events`() = runTest {
-        repeat(10) { viewModel.dispatch(TimerContract.Executor.Stop) }
-        drainSoundEvents()
-        Assert.assertFalse(viewModel.events.tryReceive().isSuccess)
-    }
-
-    @Test
-    fun `rapid Cancels send NavigateBack only once`() = runTest {
-        repeat(5) { viewModel.dispatch(TimerContract.Executor.Cancel) }
-        Assert.assertTrue(firstNonSoundEvent() is TimerContract.Event.NavigateBack)
-    }
-
-    @Test
-    fun `rapid Stop does not change remainingSeconds`() = runTest {
-        val initial = viewModel.state.remainingSeconds
-        repeat(10) { viewModel.dispatch(TimerContract.Executor.Stop) }
-        Assert.assertEquals(initial, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `rapid Resume does not change remainingSeconds`() = runTest {
-        viewModel.dispatch(TimerContract.Executor.Stop)
-        val secondsAfterStop = viewModel.state.remainingSeconds
-        repeat(10) { viewModel.dispatch(TimerContract.Executor.Resume) }
-        Assert.assertEquals(secondsAfterStop, viewModel.state.remainingSeconds)
-    }
-
-    @Test
-    fun `DataStore saves isRunning correctly after rapid alternation`() = runTest {
-        repeat(6) { i ->
-            if (i % 2 == 0) viewModel.dispatch(TimerContract.Executor.Stop)
-            else viewModel.dispatch(TimerContract.Executor.Resume)
-        }
-        Assert.assertEquals(true, dataStore.snapshot?.isRunning)
-    }
-
-    @Test
-    fun `phase does not change during rapid Stop-Resume`() = runTest {
-        val initialPhaseIndex = viewModel.state.currentPhaseIndex
-        repeat(20) { i ->
-            if (i % 2 == 0) viewModel.dispatch(TimerContract.Executor.Stop)
-            else viewModel.dispatch(TimerContract.Executor.Resume)
-        }
-        Assert.assertEquals(initialPhaseIndex, viewModel.state.currentPhaseIndex)
+    fun `isFinished is true when Finished phase emitted`() = runTest {
+        timerRepo.emit(timerState(phaseIndex = 3, remainingSeconds = 0, isRunning = false))
+        assertTrue(viewModel.state.isFinished)
     }
 
     // endregion
+}
+
+private class FakeWorkoutServiceStarter : WorkoutServiceStarter {
+    var startCallCount = 0
+    override fun start() { startCallCount++ }
 }

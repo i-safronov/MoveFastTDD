@@ -1,5 +1,9 @@
 package com.mobile.finsolve.app.movefasttdd.presentation.setup
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +53,16 @@ class SetupScreen : Screen {
     override fun Content() {
         val viewModel = hiltViewModel<SetupViewModel>()
         val navigator = LocalNavigator.currentOrThrow
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val launcher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.RequestPermission(),
+                onResult = {},
+            )
+            LaunchedEffect(Unit) {
+                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
         OnEvent(viewModel.events) { event ->
             when (event) {

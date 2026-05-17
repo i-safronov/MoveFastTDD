@@ -1,7 +1,7 @@
 package com.mobile.finsolve.app.movefasttdd.presentation.timer.view_model
 
-import com.mobile.finsolve.app.movefasttdd.data.datastore.TimerSnapshot
 import com.mobile.finsolve.app.movefasttdd.domain.model.TimerPhase
+import com.mobile.finsolve.app.movefasttdd.domain.model.TimerState
 import com.mobile.finsolve.app.movefasttdd.domain.model.WorkoutConfig
 import com.mobile.finsolve.app.movefasttdd.presentation.core.viewmodel.Apex
 
@@ -17,6 +17,9 @@ object TimerContract {
     ) : Apex.State {
         val currentPhase: TimerPhase
             get() = phases.getOrElse(currentPhaseIndex) { TimerPhase.Finished }
+
+        val isFinished: Boolean
+            get() = currentPhase is TimerPhase.Finished
 
         val currentRep: Int
             get() = phases.take(currentPhaseIndex + 1).count { it is TimerPhase.Work }
@@ -38,9 +41,8 @@ object TimerContract {
 
     sealed interface Executor : Apex.Executor {
         data object Load : Executor
-        data class StateLoaded(val snapshot: TimerSnapshot?) : Executor
         data class ConfigLoaded(val config: WorkoutConfig?) : Executor
-        data object Tick : Executor
+        data class TimerStateUpdated(val timerState: TimerState?) : Executor
         data object Stop : Executor
         data object Resume : Executor
         data object Cancel : Executor
@@ -55,10 +57,20 @@ object TimerContract {
     }
 
     sealed interface Effect : Apex.Effect {
-        data object LoadState : Effect
-        data object LoadConfig : Effect
-        data class SaveState(val snapshot: TimerSnapshot) : Effect
-        data object ClearState : Effect
-        data class StartTimer(val generation: Int) : Effect
+        data object Initialize : Effect
+        data class StartTimer(val config: WorkoutConfig) : Effect
+        data object ObserveTimer : Effect
+        data object PauseTimer : Effect
+        data object ResumeTimer : Effect
+        data object CancelTimer : Effect
     }
 }
+
+fun TimerState.toContractState() = TimerContract.State(
+    isLoading = false,
+    config = config,
+    phases = phases,
+    currentPhaseIndex = currentPhaseIndex,
+    remainingSeconds = remainingSeconds,
+    isRunning = isRunning,
+)

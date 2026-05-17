@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
         android:name=".MoveFastTddApplication"
         android:allowBackup="true"
@@ -24,6 +27,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".service.WorkoutForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
+        <receiver
+            android:name=".service.WorkoutNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.mobile.finsolve.app.movefasttdd.ACTION_PAUSE" />
+                <action android:name="com.mobile.finsolve.app.movefasttdd.ACTION_RESUME" />
+                <action android:name="com.mobile.finsolve.app.movefasttdd.ACTION_CANCEL" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>

@@ -57,8 +57,10 @@ class WorkoutNotificationManager(private val context: Context) {
         return when (currentPhase) {
             is TimerPhase.Work ->
                 context.getString(R.string.notification_phase_work) to "$timeText  •  $repText"
+
             is TimerPhase.Rest ->
                 context.getString(R.string.notification_phase_rest) to "$timeText  •  $repText"
+
             TimerPhase.Finished ->
                 context.getString(R.string.notification_phase_finished) to
                         context.getString(R.string.notification_workout_done)
@@ -72,7 +74,11 @@ class WorkoutNotificationManager(private val context: Context) {
             context.getString(R.string.notification_action_resume) to actionIntent(ACTION_RESUME, 2)
         }
         addAction(0, pauseResumeIntent.first, pauseResumeIntent.second)
-        addAction(0, context.getString(R.string.notification_action_cancel), actionIntent(ACTION_CANCEL, 3))
+        addAction(
+            0,
+            context.getString(R.string.notification_action_cancel),
+            actionIntent(ACTION_CANCEL, 3)
+        )
     }
 
     private fun actionIntent(action: String, requestCode: Int): PendingIntent =

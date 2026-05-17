@@ -41,7 +41,7 @@ class WorkoutForegroundService : LifecycleService() {
             this,
             WorkoutNotificationManager.NOTIFICATION_ID,
             currentState?.let { notificationManager.build(it) } ?: buildPlaceholderNotification(),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
         )
 
         lifecycleScope.launch {
