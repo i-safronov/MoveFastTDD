@@ -1,9 +1,11 @@
 package com.mobile.finsolve.app.movefasttdd.presentation.setup
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -55,12 +57,18 @@ class SetupScreen : Screen {
         val navigator = LocalNavigator.currentOrThrow
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val context = androidx.compose.ui.platform.LocalContext.current
             val launcher = rememberLauncherForActivityResult(
                 contract = ActivityResultContracts.RequestPermission(),
                 onResult = {},
             )
             LaunchedEffect(Unit) {
-                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                val alreadyGranted = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+                if (!alreadyGranted) {
+                    launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
         }
 
